@@ -1,0 +1,284 @@
+{% extends 'base.html' %}
+
+{% block title %}Financial Reports - FinFlow{% endblock %}
+
+{% block page_title %}Reports Generator{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <!-- Report Options Bar -->
+    <div class="stat-card mb-4">
+        <ul class="nav nav-pills mb-4 gap-2 border-bottom pb-3" id="report-tabs" role="tablist">
+            <li class="nav-item-pill" role="presentation">
+                <a href="{{ url_for('reports.view_reports', type='monthly') }}" class="btn btn-sm {% if report_type == 'monthly' %}btn-success text-white fw-bold{% else %}btn-outline-custom{% endif %}">
+                    <i class="bi bi-calendar-event"></i> Monthly Report
+                </a>
+            </li>
+            <li class="nav-item-pill" role="presentation">
+                <a href="{{ url_for('reports.view_reports', type='quarterly') }}" class="btn btn-sm {% if report_type == 'quarterly' %}btn-success text-white fw-bold{% else %}btn-outline-custom{% endif %}">
+                    <i class="bi bi-calendar-range"></i> Quarterly Report
+                </a>
+            </li>
+            <li class="nav-item-pill" role="presentation">
+                <a href="{{ url_for('reports.view_reports', type='yearly') }}" class="btn btn-sm {% if report_type == 'yearly' %}btn-success text-white fw-bold{% else %}btn-outline-custom{% endif %}">
+                    <i class="bi bi-calendar3"></i> Yearly Report
+                </a>
+            </li>
+            <li class="nav-item-pill" role="presentation">
+                <a href="{{ url_for('reports.view_reports', type='custom') }}" class="btn btn-sm {% if report_type == 'custom' %}btn-success text-white fw-bold{% else %}btn-outline-custom{% endif %}">
+                    <i class="bi bi-sliders"></i> Custom Date Report
+                </a>
+            </li>
+        </ul>
+        
+        <form action="{{ url_for('reports.view_reports') }}" method="GET" class="row g-3 align-items-end m-0">
+            <input type="hidden" name="type" value="{{ report_type }}">
+            
+            {% if report_type == 'monthly' %}
+            <div class="col-md-4">
+                <label for="month" class="form-label small fw-bold text-secondary">Choose Month</label>
+                <input type="month" name="month" id="month" class="form-control" value="{{ selected_month }}">
+            </div>
+            {% elif report_type == 'quarterly' %}
+            <div class="col-md-4">
+                <label for="quarter" class="form-label small fw-bold text-secondary">Choose Quarter</label>
+                <select name="quarter" id="quarter" class="form-select">
+                    <!-- Generate last 3 years quarters -->
+                    {% set curr_yr = date.today().year %}
+                    {% for yr in [curr_yr, curr_yr-1, curr_yr-2] %}
+                        {% for q in [1, 2, 3, 4] %}
+                            <option value="{{ yr }}-Q{{ q }}" {% if selected_quarter == yr ~ '-Q' ~ q %}selected{% endif %}>{{ yr }} - Quarter {{ q }}</option>
+                        {% endfor %}
+                    {% endfor %}
+                </select>
+            </div>
+            {% elif report_type == 'yearly' %}
+            <div class="col-md-4">
+                <label for="year" class="form-label small fw-bold text-secondary">Choose Year</label>
+                <select name="year" id="year" class="form-select">
+                    {% set curr_yr = date.today().year %}
+                    {% for yr in range(curr_yr, curr_yr-5, -1) %}
+                        <option value="{{ yr }}" {% if selected_year == yr|string %}selected{% endif %}>{{ yr }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% elif report_type == 'custom' %}
+            <div class="col-md-3">
+                <label for="start_date" class="form-label small fw-bold text-secondary">Start Date</label>
+                <input type="date" name="start_date" id="start_date" class="form-control" value="{{ start_date }}" required>
+            </div>
+            <div class="col-md-3">
+                <label for="end_date" class="form-label small fw-bold text-secondary">End Date</label>
+                <input type="date" name="end_date" id="end_date" class="form-control" value="{{ end_date }}" required>
+            </div>
+            {% endif %}
+            
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary-custom w-100"><i class="bi bi-play-circle-fill"></i> Generate Report</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Summary KPI cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="stat-card text-center">
+                <span class="card-label">Total Income</span>
+                <h3 class="fw-bold mt-2 text-success">{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(total_income) }}</h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card text-center">
+                <span class="card-label">Total Expenses</span>
+                <h3 class="fw-bold mt-2 text-danger">{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(total_expense) }}</h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card text-center">
+                <span class="card-label">Net Cash Flow</span>
+                <h3 class="fw-bold mt-2 {% if net_savings >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(net_savings) }}
+                </h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card text-center">
+                <span class="card-label">Budget Adherence</span>
+                <h6 class="fw-bold mt-3 text-secondary">{{ budget_adherence_status }}</h6>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Breakdown Row -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="stat-card" style="height: 350px;">
+                <h6 class="fw-bold mb-3">Expenses by Category</h6>
+                <div style="height: 270px; position: relative;">
+                    <canvas id="reportExpenseChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="stat-card" style="height: 350px;">
+                <h6 class="fw-bold mb-3">Incomes by Source</h6>
+                <div style="height: 270px; position: relative;">
+                    <canvas id="reportIncomeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summaries Tables Row -->
+    <div class="row g-4 mb-4">
+        <!-- Expenses category summary -->
+        <div class="col-md-6">
+            <div class="custom-table-card">
+                <div class="custom-card-header">
+                    <h6 class="m-0 fw-bold">Expenses Summary Table</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table custom-table">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Total Spent</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if category_summary %}
+                                {% for cat, val in category_summary.items() %}
+                                <tr>
+                                    <td><span class="badge bg-danger-subtle text-danger p-2 rounded-3 fs-7">{{ cat }}</span></td>
+                                    <td class="fw-bold text-danger">{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(val) }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="2" class="text-center py-3 text-secondary">No expenses in this period.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Incomes source summary -->
+        <div class="col-md-6">
+            <div class="custom-table-card">
+                <div class="custom-card-header">
+                    <h6 class="m-0 fw-bold">Income Summary Table</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table custom-table">
+                        <thead>
+                            <tr>
+                                <th>Source</th>
+                                <th>Total Received</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if source_summary %}
+                                {% for src, val in source_summary.items() %}
+                                <tr>
+                                    <td><span class="badge bg-success-subtle text-success p-2 rounded-3 fs-7">{{ src }}</span></td>
+                                    <td class="fw-bold text-success">{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(val) }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="2" class="text-center py-3 text-secondary">No income in this period.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const style = getComputedStyle(document.body);
+    const accentColor = style.getPropertyValue('--accent').trim() || '#10B981';
+    const textColor = style.getPropertyValue('--text-primary').trim() || '#0F172A';
+    
+    // Expense Breakdown
+    const expLabels = {{ chart_category_labels | tojson }};
+    const expVals = {{ chart_category_values | tojson }};
+    const expCtx = document.getElementById('reportExpenseChart');
+    
+    if (expCtx) {
+        if (expVals.length === 0) {
+            const ctx = expCtx.getContext('2d');
+            ctx.font = '14px Outfit';
+            ctx.fillStyle = '#94A3B8';
+            ctx.textAlign = 'center';
+            ctx.fillText('No expenses to plot', expCtx.width / 2, expCtx.height / 2);
+        } else {
+            new Chart(expCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: expLabels,
+                    datasets: [{
+                        data: expVals,
+                        backgroundColor: ['#EF4444', '#F59E0B', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#64748B'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: textColor, font: { family: 'Outfit' } },
+                            position: 'right'
+                        }
+                    }
+                });
+        }
+    }
+    
+    // Income Breakdown
+    const incLabels = {{ chart_source_labels | tojson }};
+    const incVals = {{ chart_source_values | tojson }};
+    const incCtx = document.getElementById('reportIncomeChart');
+    
+    if (incCtx) {
+        if (incVals.length === 0) {
+            const ctx = incCtx.getContext('2d');
+            ctx.font = '14px Outfit';
+            ctx.fillStyle = '#94A3B8';
+            ctx.textAlign = 'center';
+            ctx.fillText('No income to plot', incCtx.width / 2, incCtx.height / 2);
+        } else {
+            new Chart(incCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: incLabels,
+                    datasets: [{
+                        data: incVals,
+                        backgroundColor: ['#10B981', '#3B82F6', '#06B6D4', '#F59E0B', '#8B5CF6', '#14B8A6', '#64748B'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: textColor, font: { family: 'Outfit' } },
+                            position: 'right'
+                        }
+                    }
+                });
+        }
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}Settings - FinFlow{% endblock %}
+
+{% block page_title %}Settings & Preferences{% endblock %}
+
+{% block content %}
+<div class="row g-4 animate-fade-in">
+    <!-- App Preferences Configuration -->
+    <div class="col-lg-6">
+        <div class="stat-card">
+            <h5 class="fw-bold mb-4">Application Preferences</h5>
+            
+            <form action="{{ url_for('dashboard.view_settings') }}" method="POST">
+                <input type="hidden" name="action" value="preferences">
+                
+                <div class="mb-3">
+                    <label for="currency" class="form-label small fw-bold text-secondary">Currency Symbol</label>
+                    <select name="currency" id="currency" class="form-select">
+                        <option value="USD" {% if settings.currency == 'USD' or settings.currency == '$' %}selected{% endif %}>USD ($)</option>
+                        <option value="EUR" {% if settings.currency == 'EUR' or settings.currency == '€' %}selected{% endif %}>EUR (€)</option>
+                        <option value="GBP" {% if settings.currency == 'GBP' or settings.currency == '£' %}selected{% endif %}>GBP (£)</option>
+                        <option value="INR" {% if settings.currency == 'INR' or settings.currency == '₹' %}selected{% endif %}>INR (₹)</option>
+                        <option value="JPY" {% if settings.currency == 'JPY' or settings.currency == '¥' %}selected{% endif %}>JPY (¥)</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="theme" class="form-label small fw-bold text-secondary">Theme UI Mode</label>
+                    <select name="theme" id="theme" class="form-select">
+                        <option value="light" {% if settings.theme == 'light' %}selected{% endif %}>Light Theme</option>
+                        <option value="dark" {% if settings.theme == 'dark' %}selected{% endif %}>Dark Theme Mode</option>
+                    </select>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="export_preference" class="form-label small fw-bold text-secondary">Default Export Preference</label>
+                    <select name="export_preference" id="export_preference" class="form-select">
+                        <option value="excel" {% if settings.export_preference == 'excel' %}selected{% endif %}>Microsoft Excel (.xlsx)</option>
+                        <option value="csv" {% if settings.export_preference == 'csv' %}selected{% endif %}>Flat CSV Dataset</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary-custom w-100">
+                    <i class="bi bi-save-fill"></i> Save Preferences
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Database Backup & Restore Utility -->
+    <div class="col-lg-6">
+        <div class="stat-card mb-4">
+            <h5 class="fw-bold mb-3">Database Backup</h5>
+            <p class="text-secondary small mb-4">
+                Export your entire transaction ledger, savings targets, and budget structures in a single SQLite database file. Useful for migration or safety copies.
+            </p>
+            
+            <form action="{{ url_for('dashboard.view_settings') }}" method="POST">
+                <input type="hidden" name="action" value="backup">
+                <button type="submit" class="btn btn-outline-custom w-100 text-success border-success">
+                    <i class="bi bi-download"></i> Download Database Backup (.db)
+                </button>
+            </form>
+        </div>
+
+        <div class="stat-card">
+            <h5 class="fw-bold mb-3">Database Restore</h5>
+            <p class="text-secondary small mb-4">
+                Upload a previously saved SQLite backup file (<code>.db</code> format) to overwrite the current database.
+            </p>
+            <div class="alert alert-warning border-0 rounded-4 small p-3 mb-4">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i><strong>Warning:</strong> Restoring database will permanently overwrite and replace all current local data records!
+            </div>
+            
+            <form action="{{ url_for('dashboard.view_settings') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="restore">
+                
+                <div class="mb-4">
+                    <input type="file" name="backup_file" id="backup_file" class="form-control" accept=".db" required>
+                </div>
+                
+                <button type="submit" class="btn btn-danger bg-danger border-0 w-100 text-white fw-bold" onclick="return confirm('Are you sure you want to restore? This will overwrite the current database.');">
+                    <i class="bi bi-cloud-upload-fill"></i> Upload and Restore Database
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

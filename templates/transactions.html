@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+
+{% block title %}Transactions History - FinFlow{% endblock %}
+
+{% block page_title %}Transaction History{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <!-- Filter Panel -->
+    <div class="stat-card mb-4">
+        <form action="{{ url_for('dashboard.list_transactions') }}" method="GET" class="row g-3 align-items-end">
+            <div class="col-xl-2 col-md-4">
+                <label for="type" class="form-label small fw-bold text-secondary">Transaction Type</label>
+                <select name="type" id="type" class="form-select">
+                    <option value="">All Types</option>
+                    <option value="Income" {% if selected_type == 'Income' %}selected{% endif %}>Income</option>
+                    <option value="Expense" {% if selected_type == 'Expense' %}selected{% endif %}>Expense</option>
+                </select>
+            </div>
+            
+            <div class="col-xl-2 col-md-4">
+                <label for="category" class="form-label small fw-bold text-secondary">Category / Source</label>
+                <select name="category" id="category" class="form-select">
+                    <option value="">All Categories</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-xl-2 col-md-4">
+                <label for="start_date" class="form-label small fw-bold text-secondary">Start Date</label>
+                <input type="date" name="start_date" id="start_date" class="form-control" value="{{ start_date }}">
+            </div>
+            
+            <div class="col-xl-2 col-md-4">
+                <label for="end_date" class="form-label small fw-bold text-secondary">End Date</label>
+                <input type="date" name="end_date" id="end_date" class="form-control" value="{{ end_date }}">
+            </div>
+            
+            <div class="col-xl-2 col-md-4">
+                <label for="sort" class="form-label small fw-bold text-secondary">Sort By</label>
+                <select name="sort" id="sort" class="form-select">
+                    <option value="date_desc" {% if sort_by == 'date_desc' %}selected{% endif %}>Newest Date</option>
+                    <option value="date_asc" {% if sort_by == 'date_asc' %}selected{% endif %}>Oldest Date</option>
+                    <option value="amount_desc" {% if sort_by == 'amount_desc' %}selected{% endif %}>Highest Amount</option>
+                    <option value="amount_asc" {% if sort_by == 'amount_asc' %}selected{% endif %}>Lowest Amount</option>
+                </select>
+            </div>
+            
+            <div class="col-xl-2 col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary-custom w-100"><i class="bi bi-funnel"></i> Apply</button>
+                <a href="{{ url_for('dashboard.list_transactions') }}" class="btn btn-outline-custom w-100">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Export Quick bar -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <span class="text-secondary small">Showing <strong>{{ transactions | length }}</strong> of <strong>{{ total }}</strong> transactions.</span>
+        
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('export.export_tableau') }}" class="btn btn-sm btn-outline-primary rounded-3">
+                <i class="bi bi-bar-chart"></i> Tableau Dataset
+            </a>
+            <a href="{{ url_for('export.export_powerbi') }}" class="btn btn-sm btn-outline-info rounded-3">
+                <i class="bi bi-lightning-charge"></i> Power BI Dataset
+            </a>
+        </div>
+    </div>
+
+    <!-- Unified Transactions Table -->
+    <div class="custom-table-card mb-4">
+        <div class="table-responsive">
+            <table class="table custom-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Date</th>
+                        <th>Category / Source</th>
+                        <th>Description</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if transactions %}
+                        {% for tx in transactions %}
+                        <tr>
+                            <td>
+                                <span class="status-badge {% if tx.type == 'Income' %}status-income{% else %}status-expense{% endif %}">
+                                    {% if tx.type == 'Income' %}
+                                        <i class="bi bi-arrow-down-left-circle-fill"></i> Income
+                                    {% else %}
+                                        <i class="bi bi-arrow-up-right-circle-fill"></i> Expense
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>{{ tx.date.strftime('%Y-%m-%d') }}</td>
+                            <td class="fw-bold">{{ tx.category_or_source }}</td>
+                            <td class="text-secondary">{{ tx.description or '-' }}</td>
+                            <td class="fw-bold {% if tx.type == 'Income' %}text-success{% else %}text-danger{% endif %}">
+                                {% if tx.type == 'Income' %}+{% else %}-{% endif %}{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(tx.amount) }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-secondary">
+                                <i class="bi bi-journal-x fs-1 text-muted d-block mb-3"></i>
+                                No transactions found matching filters.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination Controls -->
+    {% if total_pages > 1 %}
+    <nav class="d-flex justify-content-center">
+        <ul class="pagination pagination-rounded gap-1">
+            <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                <a class="page-link border-0 rounded-3" href="{{ url_for('dashboard.list_transactions', page=page-1, type=selected_type, category=selected_category, start_date=start_date, end_date=end_date, sort=sort_by) }}" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                </a>
+            </li>
+            
+            {% for p in range(1, total_pages + 1) %}
+            <li class="page-item {% if page == p %}active{% endif %}">
+                <a class="page-link border-0 rounded-3 {% if page == p %}bg-success text-white{% endif %}" href="{{ url_for('dashboard.list_transactions', page=p, type=selected_type, category=selected_category, start_date=start_date, end_date=end_date, sort=sort_by) }}">{{ p }}</a>
+            </li>
+            {% endfor %}
+            
+            <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                <a class="page-link border-0 rounded-3" href="{{ url_for('dashboard.list_transactions', page=page+1, type=selected_type, category=selected_category, start_date=start_date, end_date=end_date, sort=sort_by) }}" aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

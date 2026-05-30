@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard Overview - FinFlow{% endblock %}
+
+{% block page_title %}Dashboard Overview{% endblock %}
+
+{% block content %}
+<div class="row g-4 animate-fade-in">
+    <!-- 1. Balance Card -->
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card balance-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="card-label">Total Balance</span>
+                <i class="bi bi-wallet2 fs-4"></i>
+            </div>
+            <h2 class="card-value">{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(current_balance) }}</h2>
+            <div class="mt-4">
+                <a href="{{ url_for('income.list_income') }}" class="btn btn-deposit btn-sm"><i class="bi bi-plus-lg"></i> Add Income</a>
+                <a href="{{ url_for('expense.list_expense') }}" class="btn btn-send btn-sm"><i class="bi bi-dash-lg"></i> Add Expense</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Income Card -->
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="card-label">Monthly Income</span>
+                <div class="text-success"><i class="bi bi-arrow-down-left fs-4"></i></div>
+            </div>
+            <h2 class="card-value">{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(current_month_income) }}</h2>
+            <span class="trend-badge {% if income_trend >= 0 %}trend-up{% else %}trend-down{% endif %}">
+                <i class="bi {% if income_trend >= 0 %}bi-arrow-up-right{% else %}bi-arrow-down-right{% endif %}"></i>
+                {{ "{:+.1f}".format(income_trend) }}% from last month
+            </span>
+            <div class="mt-2 text-muted" style="font-size: 0.8rem;">
+                Total Income: {{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(total_income) }}
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Expense Card -->
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="card-label">Monthly Expenses</span>
+                <div class="text-danger"><i class="bi bi-arrow-up-right fs-4"></i></div>
+            </div>
+            <h2 class="card-value">{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(current_month_expense) }}</h2>
+            <span class="trend-badge {% if expense_trend <= 0 %}trend-up{% else %}trend-down{% endif %}">
+                <i class="bi {% if expense_trend <= 0 %}bi-arrow-down-right{% else %}bi-arrow-up-right{% endif %}"></i>
+                {{ "{:+.1f}".format(expense_trend) }}% from last month
+            </span>
+            <div class="mt-2 text-muted" style="font-size: 0.8rem;">
+                Total Expenses: {{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(total_expense) }}
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Savings Progress Card -->
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="card-label">Savings Progress</span>
+                <i class="bi bi-piggy-bank text-primary fs-4"></i>
+            </div>
+            <h2 class="card-value">{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(current_savings) }}</h2>
+            <div class="d-flex justify-content-between align-items-center mt-3 mb-1" style="font-size: 0.8rem;">
+                <span class="text-muted">Target: {{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(target_savings) }}</span>
+                <span class="fw-bold text-success">{{ savings_progress_pct }}%</span>
+            </div>
+            <div class="progress" style="height: 6px; border-radius: 10px; background-color: var(--border-color);">
+                <div class="progress-bar bg-success" role="progressbar" style="width: {{ savings_progress_pct }}%; border-radius: 10px;" aria-valuenow="{{ savings_progress_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-1 animate-fade-in" style="animation-delay: 0.1s;">
+    <!-- Financial Score Card -->
+    <div class="col-xl-8 col-lg-7">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="m-0 fw-bold">Financial Health Score</h6>
+                <span class="score-badge">{{ financial_quality }}</span>
+            </div>
+            <div class="row align-items-center">
+                <div class="col-md-3 text-center mb-3 mb-md-0">
+                    <div class="display-3 fw-bold text-success m-0">{{ financial_score }}</div>
+                    <span class="text-muted" style="font-size: 0.85rem;">out of 100</span>
+                </div>
+                <div class="col-md-9">
+                    <p class="text-secondary small mb-3">
+                        Your Financial Score is calculated based on your <strong>Savings Rate</strong>, <strong>Expense Ratio</strong>, and <strong>Budget Adherence</strong>. Aim to save at least 20% of your income and keep expenses under 70% of your earnings to achieve an <strong>Excellent</strong> score.
+                    </p>
+                    <div class="score-progress-bar">
+                        <div class="score-progress-fill" style="width: {{ financial_score }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Budget Utilization Overview (mini card) -->
+    <div class="col-xl-4 col-lg-5">
+        <div class="stat-card">
+            <h6 class="m-0 fw-bold mb-3">Budget Utilization</h6>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-secondary small">Total Budget Limits:</span>
+                <span class="fw-bold">{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(total_budget_limit) }}</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-secondary small">Spent (Budgeted):</span>
+                <span class="fw-bold text-danger">{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(actual_budgeted_spent) }}</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-secondary small">Remaining:</span>
+                <span class="fw-bold text-success">{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(remaining_budget) }}</span>
+            </div>
+            {% if total_budget_limit > 0 %}
+            <div class="progress" style="height: 8px; border-radius: 10px; background-color: var(--border-color);">
+                {% set budget_util_pct = (actual_budgeted_spent / total_budget_limit * 100) %}
+                <div class="progress-bar {% if budget_util_pct > 100 %}bg-danger{% else %}bg-success{% endif %}" role="progressbar" style="width: {{ budget_util_pct }}%; border-radius: 10px;" aria-valuenow="{{ budget_util_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            {% else %}
+            <div class="text-center py-2 text-muted small">No monthly budgets configured yet.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-1 animate-fade-in" style="animation-delay: 0.2s;">
+    <!-- Cash Flow Chart (Income vs Expense) -->
+    <div class="col-xl-8 col-lg-7">
+        <div class="stat-card" style="min-height: 380px;">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h6 class="m-0 fw-bold">Cash Flow Analytics</h6>
+                <div class="text-muted small">Current Year</div>
+            </div>
+            <div style="height: 300px; position: relative;">
+                <canvas id="cashFlowChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Expense Breakdown Chart (Doughnut) -->
+    <div class="col-xl-4 col-lg-5">
+        <div class="stat-card" style="min-height: 380px;">
+            <h6 class="m-0 fw-bold mb-4">Expense Breakdown</h6>
+            <div style="height: 280px; position: relative;">
+                <canvas id="breakdownChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-1 mb-4 animate-fade-in" style="animation-delay: 0.3s;">
+    <!-- Recent Transactions Table -->
+    <div class="col-12">
+        <div class="custom-table-card">
+            <div class="custom-card-header">
+                <h6 class="m-0 fw-bold">Recent Transactions</h6>
+                <a href="{{ url_for('dashboard.list_transactions') }}" class="btn btn-sm btn-outline-custom">View All Transactions</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table custom-table">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Date</th>
+                            <th>Category / Source</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if recent_transactions %}
+                            {% for tx in recent_transactions %}
+                            <tr>
+                                <td>
+                                    <span class="status-badge {% if tx.type == 'Income' %}status-income{% else %}status-expense{% endif %}">
+                                        {% if tx.type == 'Income' %}
+                                            <i class="bi bi-arrow-down-left-circle-fill"></i> Income
+                                        {% else %}
+                                            <i class="bi bi-arrow-up-right-circle-fill"></i> Expense
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>{{ tx.date.strftime('%Y-%m-%d') }}</td>
+                                <td class="fw-bold">{{ tx.category_or_source }}</td>
+                                <td class="text-secondary">{{ tx.description }}</td>
+                                <td class="fw-bold {% if tx.type == 'Income' %}text-success{% else %}text-danger{% endif %}">
+                                    {% if tx.type == 'Income' %}+{% else %}-{% endif %}{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(tx.amount) }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-secondary">
+                                    No transaction records found. Try adding some income or expenses!
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,208 @@
+{% extends 'base.html' %}
+
+{% block title %}Budget Planner - FinFlow{% endblock %}
+
+{% block page_title %}Budget Planner{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <!-- Monthly Filter & Add Button -->
+    <div class="stat-card mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <form action="{{ url_for('budget.list_budget') }}" method="GET" class="d-flex align-items-center gap-2 m-0" id="month-form">
+                <label for="month" class="small fw-bold text-secondary text-nowrap m-0">Select Budget Month:</label>
+                <input type="month" name="month" id="month" class="form-control py-1 px-3" value="{{ selected_month }}" onchange="document.getElementById('month-form').submit();">
+            </form>
+            
+            <button class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#addBudgetModal">
+                <i class="bi bi-plus-lg"></i> Set Category Budget
+            </button>
+        </div>
+    </div>
+
+    <!-- Monthly Budget Analytics Summary -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="stat-card text-center">
+                <span class="card-label">Total Monthly Budgeted</span>
+                <h3 class="fw-bold mt-2 text-primary">{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(total_budget_limit) }}</h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card text-center">
+                <span class="card-label">Spent in Budget Categories</span>
+                <h3 class="fw-bold mt-2 text-danger">{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(total_spent) }}</h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card text-center">
+                <span class="card-label">Remaining Budget</span>
+                <h3 class="fw-bold mt-2 text-success">{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(remaining_total) }}</h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card text-center">
+                <span class="card-label">Overall Utilization</span>
+                <h3 class="fw-bold mt-2 {% if total_utilization > 100 %}text-danger{% elif total_utilization > 80 %}text-warning{% else %}text-success{% endif %}">{{ total_utilization }}%</h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- Budget Status List -->
+    <div class="row g-4">
+        <!-- Budget Categories Progress Cards -->
+        <div class="col-lg-8">
+            <div class="custom-table-card p-4">
+                <h6 class="fw-bold mb-4">Category Budgets for {{ selected_month }}</h6>
+                
+                {% if budgets %}
+                    <div class="d-flex flex-column gap-4">
+                        {% for b in budgets %}
+                        <div class="budget-row p-3 rounded-4 border" style="background-color: var(--bg-primary);">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <span class="fw-bold fs-6">{{ b.category }}</span>
+                                    {% if b.is_overspent %}
+                                        <span class="badge bg-danger-subtle text-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Overspent</span>
+                                    {% endif %}
+                                </div>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <button class="btn btn-sm btn-outline-primary border-0 rounded-3" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#editBudgetModal"
+                                            data-id="{{ b.id }}"
+                                            data-limit="{{ b.limit_amount }}"
+                                            data-category="{{ b.category }}">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                    <form action="{{ url_for('budget.delete_budget', id=b.id) }}" method="POST" class="m-0" onsubmit="return confirm('Are you sure you want to delete this budget limit?');">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger border-0 rounded-3">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-2 small text-secondary">
+                                <span>Spent: {{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(b.spent) }}</span>
+                                <span>Limit: {{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(b.limit_amount) }}</span>
+                            </div>
+                            
+                            <div class="progress mb-2" style="height: 10px; border-radius: 10px; background-color: var(--border-color);">
+                                <div class="progress-bar {% if b.utilization > 100 %}bg-danger{% elif b.utilization > 80 %}bg-warning{% else %}bg-success{% endif %}" 
+                                     role="progressbar" 
+                                     style="width: {% if b.utilization > 100 %}100%{% else %}{{ b.utilization }}%{% endif %}; border-radius: 10px;" 
+                                     aria-valuenow="{{ b.utilization }}" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="100"></div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center small">
+                                <span class="text-muted">Utilization: {{ b.utilization }}%</span>
+                                <span class="{% if b.remaining < 0 %}text-danger fw-bold{% else %}text-success{% endif %}">
+                                    {% if b.remaining < 0 %}
+                                        Over by {{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(b.remaining | abs) }}
+                                    {% else %}
+                                        {{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(b.remaining) }} Left
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5 text-secondary">
+                        <i class="bi bi-pie-chart fs-1 text-muted d-block mb-3"></i>
+                        No category budgets configured for this month. Click the button above to allocate limits.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Custom Guidance info -->
+        <div class="col-lg-4">
+            <div class="stat-card">
+                <h6 class="m-0 fw-bold mb-3">Budgeting Rules of Thumb</h6>
+                <p class="text-secondary small">
+                    Allocate your funds wisely using standard frameworks like the <strong>50/30/20 Rule</strong>:
+                </p>
+                <ul class="text-secondary small ps-3">
+                    <li class="mb-2"><strong>50% Needs:</strong> Rent, bills, essential education, and transport.</li>
+                    <li class="mb-2"><strong>30% Wants:</strong> Entertainment, dining out, books, shopping, and travel.</li>
+                    <li><strong>20% Savings:</strong> Emergency fund goals, certificates, or buying a laptop.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Set/Add Budget -->
+<div class="modal fade" id="addBudgetModal" tabindex="-1" aria-labelledby="addBudgetModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold" id="addBudgetModalLabel">Set Monthly Budget</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('budget.add_budget') }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="add-month" class="form-label small fw-bold">Budget Month</label>
+                        <input type="month" name="month" id="add-month" class="form-control" required value="{{ selected_month }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="add-category" class="form-label small fw-bold">Category</label>
+                        <select name="category" id="add-category" class="form-select" required>
+                            {% for cat in categories %}
+                                <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="add-limit" class="form-label small fw-bold">Monthly Limit</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-transparent">{{ settings.currency if settings else '$' }}</span>
+                            <input type="number" step="0.01" name="limit_amount" id="add-limit" class="form-control" placeholder="0.00" required min="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-custom">Save Budget</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Edit Budget -->
+<div class="modal fade" id="editBudgetModal" tabindex="-1" aria-labelledby="editBudgetModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold" id="editBudgetModalLabel">Edit Budget Limit</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold d-block">Category</label>
+                        <h6 id="edit-category-name" class="fw-bold">Category Name</h6>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-limit" class="form-label small fw-bold">Limit Amount</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-transparent">{{ settings.currency if settings else '$' }}</span>
+                            <input type="number" step="0.01" name="limit_amount" id="edit-limit" class="form-control" required min="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-custom">Update Budget</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

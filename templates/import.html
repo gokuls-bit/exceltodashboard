@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Import Data - FinFlow{% endblock %}
+
+{% block page_title %}Data Import{% endblock %}
+
+{% block content %}
+<div class="row g-4 animate-fade-in">
+    <!-- File Upload Box -->
+    <div class="col-lg-6">
+        <div class="stat-card">
+            <h5 class="fw-bold mb-4">Upload Dataset</h5>
+            
+            <form action="{{ url_for('export.import_data') }}" method="POST" enctype="multipart/form-data">
+                <div class="mb-4">
+                    <label for="type" class="form-label small fw-bold text-secondary">Dataset Type</label>
+                    <select name="type" id="type" class="form-select" required>
+                        <option value="income">Income Records</option>
+                        <option value="expense">Expense Records</option>
+                    </select>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="file" class="form-label small fw-bold text-secondary">Choose CSV or Excel File</label>
+                    <input type="file" name="file" id="file" class="form-control" accept=".csv, .xlsx, .xls" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary-custom w-100">
+                    <i class="bi bi-cloud-upload-fill"></i> Upload and Import Into Database
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Upload Guidelines -->
+    <div class="col-lg-6">
+        <div class="stat-card">
+            <h5 class="fw-bold mb-3">CSV / Excel Format Guidelines</h5>
+            <p class="text-secondary small mb-4">
+                To ensure a successful import, please verify that your spreadsheet columns match the exact headers listed below.
+            </p>
+            
+            <div class="mb-3">
+                <h6 class="fw-bold text-success small mb-2"><i class="bi bi-arrow-down-left-circle"></i> Income Sheet Headers</h6>
+                <table class="table table-bordered table-sm small text-secondary">
+                    <thead>
+                        <tr class="table-light">
+                            <th>Column Name</th>
+                            <th>Requirement</th>
+                            <th>Description / Format</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>date</code></td>
+                            <td>Required</td>
+                            <td>Format: <code>YYYY-MM-DD</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>source</code></td>
+                            <td>Required</td>
+                            <td>E.g., Freelancing, Pocket Money, Stipend</td>
+                        </tr>
+                        <tr>
+                            <td><code>amount</code></td>
+                            <td>Required</td>
+                            <td>Numeric (decimal allowed) e.g., <code>150.00</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>description</code></td>
+                            <td>Optional</td>
+                            <td>Text string describing details</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div>
+                <h6 class="fw-bold text-danger small mb-2"><i class="bi bi-arrow-up-right-circle"></i> Expense Sheet Headers</h6>
+                <table class="table table-bordered table-sm small text-secondary">
+                    <thead>
+                        <tr class="table-light">
+                            <th>Column Name</th>
+                            <th>Requirement</th>
+                            <th>Description / Format</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>date</code></td>
+                            <td>Required</td>
+                            <td>Format: <code>YYYY-MM-DD</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>category</code></td>
+                            <td>Required</td>
+                            <td>E.g., Food, Transport, Rent, Shopping</td>
+                        </tr>
+                        <tr>
+                            <td><code>amount</code></td>
+                            <td>Required</td>
+                            <td>Numeric (decimal allowed) e.g., <code>45.50</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>description</code></td>
+                            <td>Optional</td>
+                            <td>Text string describing details</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
