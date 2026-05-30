@@ -1,7 +1,8 @@
-from flask import Blueprint, render_template, jsonify
+from flask import Blueprint, render_template, jsonify, request, redirect, url_for, flash, send_file, current_app
 from database.models import db, Income, Expense, Budget, SavingsGoal, Settings
 from datetime import datetime, date
 from sqlalchemy import extract, func
+import os
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -74,7 +75,6 @@ def home():
     current_year = today.year
     current_month = today.month
     
-    # Format month as string YYYY-MM
     curr_month_str = today.strftime('%Y-%m')
     
     # Calculate Total Incomes & Expenses
@@ -107,17 +107,14 @@ def home():
         expense_trend = ((current_month_expense - prev_month_expense) / prev_month_expense) * 100
         
     # Budget Planner Metrics
-    # Get current month budget limits
     total_budget_limit = db.session.query(func.sum(Budget.limit_amount))\
         .filter(Budget.month == curr_month_str).scalar() or 0.0
         
-    # Calculate actual spending in categories that have budgets set
     budgets = Budget.query.filter(Budget.month == curr_month_str).all()
     budgeted_categories = [b.category for b in budgets]
     
     actual_budgeted_spent = 0.0
     if budgeted_categories:
-        # Sum expenses in budgeted categories for current month
         actual_budgeted_spent = db.session.query(func.sum(Expense.amount))\
             .filter(
                 extract('year', Expense.date) == current_year,
@@ -142,7 +139,6 @@ def home():
     )
     
     # Recent Transactions
-    # Retrieve top 5 recent incomes and expenses, format them dynamically
     incomes = Income.query.order_by(Income.date.desc(), Income.id.desc()).limit(5).all()
     expenses = Expense.query.order_by(Expense.date.desc(), Expense.id.desc()).limit(5).all()
     
@@ -235,7 +231,6 @@ def charts_data():
     for b in budgets:
         budget_labels.append(b.category)
         budget_limits.append(b.limit_amount)
-        # Sum actual spent in this category for current month
         spent = db.session.query(func.sum(Expense.amount)).filter(
             Expense.category == b.category,
             extract('year', Expense.date) == today.year,
@@ -270,3 +265,137 @@ def charts_data():
             'target': savings_target
         }
     })
+
+@dashboard_bp.route('/transactions')
+def list_transactions():
+    settings = get_current_settings()
+    
+    # Pagination & filtering parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = 15
+    
+    tx_type = request.args.get('type', '')
+    category_filter = request.args.get('category', '')
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    sort_by = request.args.get('sort', 'date_desc')
+    
+    incomes = Income.query.all()
+    expenses = Expense.query.all()
+    
+    tx_list = []
+    for inc in incomes:
+        tx_list.append({
+            'type': 'Income',
+            'date': inc.date,
+            'category_or_source': inc.source,
+            'amount': inc.amount,
+            'description': inc.description or ''
+        })
+    for exp in expenses:
+        tx_list.append({
+            'type': 'Expense',
+            'date': exp.date,
+            'category_or_source': exp.category,
+            'amount': exp.amount,
+            'description': exp.description or ''
+        })
+        
+    # Filter list
+    if tx_type:
+        tx_list = [tx for tx in tx_list if tx['type'] == tx_type]
+    if category_filter:
+        tx_list = [tx for tx in tx_list if tx['category_or_source'] == category_filter]
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+            tx_list = [tx for tx in tx_list if tx['date'] >= start_dt]
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+            tx_list = [tx for tx in tx_list if tx['date'] <= end_dt]
+        except ValueError:
+            pass
+            
+    # Sort list
+    if sort_by == 'date_asc':
+        tx_list.sort(key=lambda x: x['date'])
+    elif sort_by == 'date_desc':
+        tx_list.sort(key=lambda x: x['date'], reverse=True)
+    elif sort_by == 'amount_asc':
+        tx_list.sort(key=lambda x: x['amount'])
+    elif sort_by == 'amount_desc':
+        tx_list.sort(key=lambda x: x['amount'], reverse=True)
+        
+    total = len(tx_list)
+    start = (page - 1) * per_page
+    end = start + per_page
+    paginated_txs = tx_list[start:end]
+    
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+    
+    categories = [
+        "Part-Time Income", "Freelancing", "Scholarship", "Pocket Money", "Internship Stipend", "Business Income", "Other Income",
+        "Food", "Transport", "Rent", "Education", "Books", "Shopping", "Entertainment", "Health", "Travel", "Subscriptions", "Other"
+    ]
+    
+    return render_template(
+        'transactions.html',
+        settings=settings,
+        transactions=paginated_txs,
+        page=page,
+        total_pages=total_pages,
+        total=total,
+        per_page=per_page,
+        selected_type=tx_type,
+        selected_category=category_filter,
+        start_date=start_date,
+        end_date=end_date,
+        sort_by=sort_by,
+        categories=categories
+    )
+
+@dashboard_bp.route('/settings', methods=['GET', 'POST'])
+def view_settings():
+    settings = get_current_settings()
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'preferences':
+            currency = request.form.get('currency', 'USD')
+            theme = request.form.get('theme', 'light')
+            export_pref = request.form.get('export_preference', 'excel')
+            
+            settings.currency = currency
+            settings.theme = theme
+            settings.export_preference = export_pref
+            db.session.commit()
+            
+            flash("Preferences updated successfully!", "success")
+            return redirect(url_for('dashboard.view_settings'))
+            
+        elif action == 'backup':
+            db_path = os.path.join(current_app.instance_path, 'finance.db')
+            return send_file(db_path, as_attachment=True, download_name="finance_backup.db")
+            
+        elif action == 'restore':
+            file = request.files.get('backup_file')
+            if not file or file.filename == '':
+                flash("No file selected for restore.", "danger")
+                return redirect(url_for('dashboard.view_settings'))
+                
+            try:
+                db.session.remove()
+                db.engine.dispose()
+                db_path = os.path.join(current_app.instance_path, 'finance.db')
+                file.save(db_path)
+                flash("Database restored successfully!", "success")
+            except Exception as e:
+                flash(f"Error restoring database: {str(e)}", "danger")
+                
+            return redirect(url_for('dashboard.home'))
+
+    return render_template('settings.html', settings=settings)
