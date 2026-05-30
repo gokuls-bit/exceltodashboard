@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ settings.theme if settings else 'light' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Student Finance Dashboard{% endblock %}</title>
+    
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    {% block styles %}{% endblock %}
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-area">
+                    <span class="logo-icon"><i class="bi bi-wallet2"></i></span>
+                    <span class="logo-text">Fin<span>Flow</span></span>
+                </div>
+            </div>
+            
+            <div class="profile-card">
+                <div class="profile-avatar">
+                    <span class="avatar-placeholder">ST</span>
+                </div>
+                <div class="profile-info">
+                    <h6 class="profile-name">Alex Mercer</h6>
+                    <span class="profile-role">Student Account</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <div class="nav-section-title">Main Menu</div>
+                <a href="{{ url_for('dashboard.home') }}" class="nav-item {% if request.path == '/' %}active{% endif %}">
+                    <i class="bi bi-grid-fill"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('income.list_income') }}" class="nav-item {% if '/income' in request.path %}active{% endif %}">
+                    <i class="bi bi-arrow-down-left-circle-fill"></i>
+                    <span>Income</span>
+                </a>
+                <a href="{{ url_for('expense.list_expense') }}" class="nav-item {% if '/expense' in request.path %}active{% endif %}">
+                    <i class="bi bi-arrow-up-right-circle-fill"></i>
+                    <span>Expenses</span>
+                </a>
+                <a href="{{ url_for('dashboard.list_transactions') }}" class="nav-item {% if '/transactions' in request.path %}active{% endif %}">
+                    <i class="bi bi-arrow-left-right"></i>
+                    <span>Transactions</span>
+                </a>
+                <a href="{{ url_for('budget.list_budget') }}" class="nav-item {% if '/budget' in request.path %}active{% endif %}">
+                    <i class="bi bi-pie-chart-fill"></i>
+                    <span>Budget Planner</span>
+                </a>
+                <a href="{{ url_for('savings.list_savings') }}" class="nav-item {% if '/savings' in request.path %}active{% endif %}">
+                    <i class="bi bi-piggy-bank-fill"></i>
+                    <span>Savings Goals</span>
+                </a>
+                
+                <div class="nav-section-title mt-4">Analysis & Export</div>
+                <a href="{{ url_for('reports.view_reports') }}" class="nav-item {% if '/reports' in request.path %}active{% endif %}">
+                    <i class="bi bi-bar-chart-line-fill"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="{{ url_for('export.import_data') }}" class="nav-item {% if '/import' in request.path %}active{% endif %}">
+                    <i class="bi bi-upload"></i>
+                    <span>Data Import</span>
+                </a>
+                <a href="{{ url_for('dashboard.view_settings') }}" class="nav-item {% if '/settings' in request.path %}active{% endif %}">
+                    <i class="bi bi-gear-fill"></i>
+                    <span>Settings</span>
+                </a>
+            </nav>
+            
+            <!-- Upgrade Plan Promo -->
+            <div class="sidebar-promo">
+                <i class="bi bi-gem promo-icon"></i>
+                <h5>Go Pro</h5>
+                <p>Unlock detailed multi-currency sheets & custom data charts.</p>
+                <a href="#" class="btn btn-promo btn-sm">Upgrade Plan <i class="bi bi-arrow-right"></i></a>
+            </div>
+        </aside>
+        
+        <!-- Main Content Wrapper -->
+        <main class="main-content">
+            <!-- Top Header -->
+            <header class="top-header">
+                <div class="header-search">
+                    <h5 class="m-0 page-title">{% block page_title %}Dashboard Overview{% endblock %}</h5>
+                </div>
+                
+                <div class="header-actions">
+                    <div class="date-badge d-none d-md-flex">
+                        <i class="bi bi-calendar3"></i>
+                        <span id="header-date">May 31, 2026</span>
+                    </div>
+                    
+                    <a href="{{ url_for('export.export_excel') }}" class="btn btn-sm btn-outline-success border-2 rounded-3 me-2">
+                        <i class="bi bi-file-earmark-excel"></i> Export Excel
+                    </a>
+                    
+                    <!-- Quick Theme Toggle Form -->
+                    <form action="{{ url_for('dashboard.view_settings') }}" method="POST" id="theme-toggle-form" class="m-0">
+                        <input type="hidden" name="action" value="preferences">
+                        <input type="hidden" name="currency" value="{{ settings.currency if settings else 'USD' }}">
+                        <input type="hidden" name="export_preference" value="{{ settings.export_preference if settings else 'excel' }}">
+                        <input type="hidden" name="theme" id="theme-value" value="{{ 'dark' if not settings or settings.theme == 'light' else 'light' }}">
+                        
+                        <button type="submit" class="theme-toggle-btn" title="Toggle Light/Dark Mode">
+                            {% if settings and settings.theme == 'dark' %}
+                                <i class="bi bi-sun-fill"></i>
+                            {% else %}
+                                <i class="bi bi-moon-fill"></i>
+                            {% endif %}
+                        </button>
+                    </form>
+                </div>
+            </header>
+            
+            <!-- Flask Alerts -->
+            <div class="container-fluid mt-3 px-4">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show border-0 rounded-4 shadow-sm" role="alert">
+                                <i class="bi {% if category == 'success' %}bi-check-circle-fill{% elif category == 'danger' %}bi-exclamation-triangle-fill{% else %}bi-info-circle-fill{% endif %} me-2"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <!-- Page Body -->
+            <div class="content-body container-fluid px-4 py-3">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <!-- Bootstrap 5 Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Main JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <script>
+        // Update header date
+        document.getElementById('header-date').innerText = new Date().toLocaleDateString('en-US', {
+            weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
