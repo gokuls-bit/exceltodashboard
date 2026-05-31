@@ -16,7 +16,9 @@ def require_login():
 
 @auth_bp.app_context_processor
 def inject_user_and_settings():
+    from datetime import date
     user_id = session.get('user_id')
+    user_context = dict(current_user=None, settings=None, date=date, round=round)
     if user_id:
         user = User.query.get(user_id)
         if user:
@@ -26,8 +28,8 @@ def inject_user_and_settings():
                 settings = Settings(currency='USD', theme='light', export_preference='excel', user_id=user.id)
                 db.session.add(settings)
                 db.session.commit()
-            return dict(current_user=user, settings=settings)
-    return dict(current_user=None, settings=None)
+            user_context.update(current_user=user, settings=settings)
+    return user_context
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
