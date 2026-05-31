@@ -1,5 +1,6 @@
 import os
 from flask import Flask, redirect, url_for
+from database.models import db
 from routes.auth import auth_bp
 from routes.dashboard import dashboard_bp
 from routes.income import income_bp
