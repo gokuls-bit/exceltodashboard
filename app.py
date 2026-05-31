@@ -1,6 +1,6 @@
 import os
 from flask import Flask, redirect, url_for
-from database.models import db, Settings
+from routes.auth import auth_bp
 from routes.dashboard import dashboard_bp
 from routes.income import income_bp
 from routes.expense import expense_bp
@@ -23,6 +23,7 @@ def create_app():
     db.init_app(app)
     
     # Register blueprints
+    app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(income_bp)
     app.register_blueprint(expense_bp)
@@ -33,11 +34,6 @@ def create_app():
     
     with app.app_context():
         db.create_all()
-        # Initialize default settings if not exists
-        if not Settings.query.first():
-            default_settings = Settings(currency='USD', theme='light', export_preference='excel')
-            db.session.add(default_settings)
-            db.session.commit()
             
     return app
 

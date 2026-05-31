@@ -1,13 +1,14 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from database.models import db, Income, Settings
 from datetime import datetime
 
 income_bp = Blueprint('income', __name__)
 
 def get_current_settings():
-    settings = Settings.query.first()
+    user_id = session.get('user_id')
+    settings = Settings.query.filter_by(user_id=user_id).first()
     if not settings:
-        settings = Settings(currency='USD', theme='light', export_preference='excel')
+        settings = Settings(currency='USD', theme='light', export_preference='excel', user_id=user_id)
         db.session.add(settings)
         db.session.commit()
     return settings
@@ -22,7 +23,7 @@ def list_income():
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
     
-    query = Income.query
+    query = Income.query.filter_by(user_id=session['user_id'])
     
     if search_query:
         query = query.filter(Income.description.like(f"%{search_query}%") | Income.source.like(f"%{search_query}%"))
@@ -75,7 +76,13 @@ def add_income():
         amount = float(amount_str)
         date_val = datetime.strptime(date_str, '%Y-%m-%d').date()
         
-        new_income = Income(date=date_val, source=source, amount=amount, description=description)
+        new_income = Income(
+            date=date_val,
+            source=source,
+            amount=amount,
+            description=description,
+            user_id=session['user_id']
+        )
         db.session.add(new_income)
         db.session.commit()
         
@@ -89,7 +96,7 @@ def add_income():
 
 @income_bp.route('/income/edit/<int:id>', methods=['POST'])
 def edit_income(id):
-    income = Income.query.get_or_400_dict = Income.query.get_or_404(id)
+    income = Income.query.filter_by(id=id, user_id=session['user_id']).first_or_404()
     try:
         date_str = request.form.get('date')
         source = request.form.get('source')
@@ -116,7 +123,7 @@ def edit_income(id):
 
 @income_bp.route('/income/delete/<int:id>', methods=['POST'])
 def delete_income(id):
-    income = Income.query.get_or_404(id)
+    income = Income.query.filter_by(id=id, user_id=session['user_id']).first_or_404()
     try:
         db.session.delete(income)
         db.session.commit()

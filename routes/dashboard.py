@@ -1,15 +1,18 @@
-from flask import Blueprint, render_template, jsonify, request, redirect, url_for, flash, send_file, current_app
+from flask import Blueprint, render_template, jsonify, request, redirect, url_for, flash, send_file, current_app, session
 from database.models import db, Income, Expense, Budget, SavingsGoal, Settings
 from datetime import datetime, date
 from sqlalchemy import extract, func
 import os
+import json
+import io
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
 def get_current_settings():
-    settings = Settings.query.first()
+    user_id = session.get('user_id')
+    settings = Settings.query.filter_by(user_id=user_id).first()
     if not settings:
-        settings = Settings(currency='USD', theme='light', export_preference='excel')
+        settings = Settings(currency='USD', theme='light', export_preference='excel', user_id=user_id)
         db.session.add(settings)
         db.session.commit()
     return settings
@@ -71,31 +74,32 @@ def get_financial_score(income_val, expense_val, savings_val, budget_val, actual
 @dashboard_bp.route('/')
 def home():
     settings = get_current_settings()
+    user_id = session['user_id']
     today = date.today()
     current_year = today.year
     current_month = today.month
     
     curr_month_str = today.strftime('%Y-%m')
     
-    # Calculate Total Incomes & Expenses
-    total_income = db.session.query(func.sum(Income.amount)).scalar() or 0.0
-    total_expense = db.session.query(func.sum(Expense.amount)).scalar() or 0.0
+    # Calculate Total Incomes & Expenses (User specific)
+    total_income = db.session.query(func.sum(Income.amount)).filter(Income.user_id == user_id).scalar() or 0.0
+    total_expense = db.session.query(func.sum(Expense.amount)).filter(Expense.user_id == user_id).scalar() or 0.0
     current_balance = total_income - total_expense
     
     # Current Month metrics
     current_month_income = db.session.query(func.sum(Income.amount))\
-        .filter(extract('year', Income.date) == current_year, extract('month', Income.date) == current_month).scalar() or 0.0
+        .filter(Income.user_id == user_id, extract('year', Income.date) == current_year, extract('month', Income.date) == current_month).scalar() or 0.0
     current_month_expense = db.session.query(func.sum(Expense.amount))\
-        .filter(extract('year', Expense.date) == current_year, extract('month', Expense.date) == current_month).scalar() or 0.0
+        .filter(Expense.user_id == user_id, extract('year', Expense.date) == current_year, extract('month', Expense.date) == current_month).scalar() or 0.0
         
     # Previous Month metrics (for trend)
     prev_month = current_month - 1 if current_month > 1 else 12
     prev_year = current_year if current_month > 1 else current_year - 1
     
     prev_month_income = db.session.query(func.sum(Income.amount))\
-        .filter(extract('year', Income.date) == prev_year, extract('month', Income.date) == prev_month).scalar() or 0.0
+        .filter(Income.user_id == user_id, extract('year', Income.date) == prev_year, extract('month', Income.date) == prev_month).scalar() or 0.0
     prev_month_expense = db.session.query(func.sum(Expense.amount))\
-        .filter(extract('year', Expense.date) == prev_year, extract('month', Expense.date) == prev_month).scalar() or 0.0
+        .filter(Expense.user_id == user_id, extract('year', Expense.date) == prev_year, extract('month', Expense.date) == prev_month).scalar() or 0.0
         
     # Calculate Trends (percentage growth)
     income_trend = 0.0
@@ -108,15 +112,16 @@ def home():
         
     # Budget Planner Metrics
     total_budget_limit = db.session.query(func.sum(Budget.limit_amount))\
-        .filter(Budget.month == curr_month_str).scalar() or 0.0
+        .filter(Budget.user_id == user_id, Budget.month == curr_month_str).scalar() or 0.0
         
-    budgets = Budget.query.filter(Budget.month == curr_month_str).all()
+    budgets = Budget.query.filter(Budget.user_id == user_id, Budget.month == curr_month_str).all()
     budgeted_categories = [b.category for b in budgets]
     
     actual_budgeted_spent = 0.0
     if budgeted_categories:
         actual_budgeted_spent = db.session.query(func.sum(Expense.amount))\
             .filter(
+                Expense.user_id == user_id,
                 extract('year', Expense.date) == current_year,
                 extract('month', Expense.date) == current_month,
                 Expense.category.in_(budgeted_categories)
@@ -125,8 +130,8 @@ def home():
     remaining_budget = total_budget_limit - actual_budgeted_spent
     
     # Savings Goals Metrics
-    current_savings = db.session.query(func.sum(SavingsGoal.current_amount)).scalar() or 0.0
-    target_savings = db.session.query(func.sum(SavingsGoal.target_amount)).scalar() or 0.0
+    current_savings = db.session.query(func.sum(SavingsGoal.current_amount)).filter(SavingsGoal.user_id == user_id).scalar() or 0.0
+    target_savings = db.session.query(func.sum(SavingsGoal.target_amount)).filter(SavingsGoal.user_id == user_id).scalar() or 0.0
     savings_progress_pct = round((current_savings / target_savings * 100), 1) if target_savings > 0 else 0.0
     
     # Financial Score
@@ -139,8 +144,8 @@ def home():
     )
     
     # Recent Transactions
-    incomes = Income.query.order_by(Income.date.desc(), Income.id.desc()).limit(5).all()
-    expenses = Expense.query.order_by(Expense.date.desc(), Expense.id.desc()).limit(5).all()
+    incomes = Income.query.filter_by(user_id=user_id).order_by(Income.date.desc(), Income.id.desc()).limit(5).all()
+    expenses = Expense.query.filter_by(user_id=user_id).order_by(Expense.date.desc(), Expense.id.desc()).limit(5).all()
     
     recent_transactions = []
     for inc in incomes:
@@ -189,6 +194,7 @@ def charts_data():
     today = date.today()
     current_year = today.year
     curr_month_str = today.strftime('%Y-%m')
+    user_id = session['user_id']
     
     # 1. Cash Flow Chart: Monthly Income vs Expense (Current Year)
     months_labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -198,7 +204,7 @@ def charts_data():
     incomes = db.session.query(
         extract('month', Income.date).label('month'),
         func.sum(Income.amount)
-    ).filter(extract('year', Income.date) == current_year).group_by('month').all()
+    ).filter(Income.user_id == user_id, extract('year', Income.date) == current_year).group_by('month').all()
     
     for m, val in incomes:
         if 1 <= m <= 12:
@@ -207,7 +213,7 @@ def charts_data():
     expenses = db.session.query(
         extract('month', Expense.date).label('month'),
         func.sum(Expense.amount)
-    ).filter(extract('year', Expense.date) == current_year).group_by('month').all()
+    ).filter(Expense.user_id == user_id, extract('year', Expense.date) == current_year).group_by('month').all()
     
     for m, val in expenses:
         if 1 <= m <= 12:
@@ -217,13 +223,13 @@ def charts_data():
     expense_categories = db.session.query(
         Expense.category,
         func.sum(Expense.amount)
-    ).group_by(Expense.category).all()
+    ).filter(Expense.user_id == user_id).group_by(Expense.category).all()
     
     breakdown_labels = [c[0] for c in expense_categories]
     breakdown_values = [float(c[1] or 0.0) for c in expense_categories]
     
     # 3. Budget Utilization: Category-wise limit vs actual spent
-    budgets = Budget.query.filter(Budget.month == curr_month_str).all()
+    budgets = Budget.query.filter(Budget.user_id == user_id, Budget.month == curr_month_str).all()
     budget_labels = []
     budget_limits = []
     budget_spent = []
@@ -233,13 +239,14 @@ def charts_data():
         budget_limits.append(b.limit_amount)
         spent = db.session.query(func.sum(Expense.amount)).filter(
             Expense.category == b.category,
+            Expense.user_id == user_id,
             extract('year', Expense.date) == today.year,
             extract('month', Expense.date) == today.month
         ).scalar() or 0.0
         budget_spent.append(float(spent))
         
     # 4. Savings Progress
-    savings_goals = SavingsGoal.query.all()
+    savings_goals = SavingsGoal.query.filter_by(user_id=user_id).all()
     savings_labels = [sg.name for sg in savings_goals]
     savings_current = [sg.current_amount for sg in savings_goals]
     savings_target = [sg.target_amount for sg in savings_goals]
@@ -269,6 +276,7 @@ def charts_data():
 @dashboard_bp.route('/transactions')
 def list_transactions():
     settings = get_current_settings()
+    user_id = session['user_id']
     
     # Pagination & filtering parameters
     page = request.args.get('page', 1, type=int)
@@ -280,8 +288,8 @@ def list_transactions():
     end_date = request.args.get('end_date', '')
     sort_by = request.args.get('sort', 'date_desc')
     
-    incomes = Income.query.all()
-    expenses = Expense.query.all()
+    incomes = Income.query.filter_by(user_id=user_id).all()
+    expenses = Expense.query.filter_by(user_id=user_id).all()
     
     tx_list = []
     for inc in incomes:
@@ -360,6 +368,7 @@ def list_transactions():
 @dashboard_bp.route('/settings', methods=['GET', 'POST'])
 def view_settings():
     settings = get_current_settings()
+    user_id = session['user_id']
     
     if request.method == 'POST':
         action = request.form.get('action')
@@ -375,11 +384,31 @@ def view_settings():
             db.session.commit()
             
             flash("Preferences updated successfully!", "success")
+            
+            # Smart redirect: if toggled via header form elsewhere, go back. Otherwise reload settings.
+            referrer = request.referrer
+            if referrer and 'settings' not in referrer and 'preferences' not in referrer:
+                return redirect(referrer)
             return redirect(url_for('dashboard.view_settings'))
             
         elif action == 'backup':
-            db_path = os.path.join(current_app.instance_path, 'finance.db')
-            return send_file(db_path, as_attachment=True, download_name="finance_backup.db")
+            # Export user specific data as JSON (Multi-user safe, no SQLite locking issues)
+            data = {
+                'settings': settings.to_dict(),
+                'incomes': [inc.to_dict() for inc in Income.query.filter_by(user_id=user_id).all()],
+                'expenses': [exp.to_dict() for exp in Expense.query.filter_by(user_id=user_id).all()],
+                'budgets': [b.to_dict() for b in Budget.query.filter_by(user_id=user_id).all()],
+                'savings_goals': [sg.to_dict() for sg in SavingsGoal.query.filter_by(user_id=user_id).all()]
+            }
+            
+            json_str = json.dumps(data, indent=2)
+            json_io = io.BytesIO(json_str.encode('utf-8'))
+            return send_file(
+                json_io,
+                as_attachment=True,
+                download_name="finflow_backup.json",
+                mimetype="application/json"
+            )
             
         elif action == 'restore':
             file = request.files.get('backup_file')
@@ -388,13 +417,78 @@ def view_settings():
                 return redirect(url_for('dashboard.view_settings'))
                 
             try:
-                db.session.remove()
-                db.engine.dispose()
-                db_path = os.path.join(current_app.instance_path, 'finance.db')
-                file.save(db_path)
-                flash("Database restored successfully!", "success")
+                # Read and parse JSON content
+                backup_data = json.loads(file.read().decode('utf-8'))
+                
+                # Validation check
+                required_keys = ['incomes', 'expenses', 'budgets', 'savings_goals']
+                if not all(k in backup_data for k in required_keys):
+                    flash("Invalid backup file format. Must be a valid FinFlow JSON backup.", "danger")
+                    return redirect(url_for('dashboard.view_settings'))
+                
+                # Delete existing user records
+                Income.query.filter_by(user_id=user_id).delete()
+                Expense.query.filter_by(user_id=user_id).delete()
+                Budget.query.filter_by(user_id=user_id).delete()
+                SavingsGoal.query.filter_by(user_id=user_id).delete()
+                
+                # Restore incomes
+                for item in backup_data.get('incomes', []):
+                    date_val = datetime.strptime(item['date'], '%Y-%m-%d').date() if item.get('date') else date.today()
+                    new_inc = Income(
+                        user_id=user_id,
+                        date=date_val,
+                        source=item['source'],
+                        amount=item['amount'],
+                        description=item.get('description', '')
+                    )
+                    db.session.add(new_inc)
+                    
+                # Restore expenses
+                for item in backup_data.get('expenses', []):
+                    date_val = datetime.strptime(item['date'], '%Y-%m-%d').date() if item.get('date') else date.today()
+                    new_exp = Expense(
+                        user_id=user_id,
+                        date=date_val,
+                        category=item['category'],
+                        amount=item['amount'],
+                        description=item.get('description', '')
+                    )
+                    db.session.add(new_exp)
+                    
+                # Restore budgets
+                for item in backup_data.get('budgets', []):
+                    new_b = Budget(
+                        user_id=user_id,
+                        category=item['category'],
+                        limit_amount=item['limit_amount'],
+                        month=item['month']
+                    )
+                    db.session.add(new_b)
+                    
+                # Restore savings goals
+                for item in backup_data.get('savings_goals', []):
+                    date_val = datetime.strptime(item['target_date'], '%Y-%m-%d').date() if item.get('target_date') else None
+                    new_sg = SavingsGoal(
+                        user_id=user_id,
+                        name=item['name'],
+                        target_amount=item['target_amount'],
+                        current_amount=item['current_amount'],
+                        target_date=date_val
+                    )
+                    db.session.add(new_sg)
+                    
+                # Restore settings
+                if 'settings' in backup_data and backup_data['settings']:
+                    settings.currency = backup_data['settings'].get('currency', 'USD')
+                    settings.theme = backup_data['settings'].get('theme', 'light')
+                    settings.export_preference = backup_data['settings'].get('export_preference', 'excel')
+                
+                db.session.commit()
+                flash("Database records restored successfully from backup!", "success")
             except Exception as e:
-                flash(f"Error restoring database: {str(e)}", "danger")
+                db.session.rollback()
+                flash(f"Error restoring backup: {str(e)}", "danger")
                 
             return redirect(url_for('dashboard.home'))
 

@@ -1,13 +1,14 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from database.models import db, Expense, Settings
 from datetime import datetime
 
 expense_bp = Blueprint('expense', __name__)
 
 def get_current_settings():
-    settings = Settings.query.first()
+    user_id = session.get('user_id')
+    settings = Settings.query.filter_by(user_id=user_id).first()
     if not settings:
-        settings = Settings(currency='USD', theme='light', export_preference='excel')
+        settings = Settings(currency='USD', theme='light', export_preference='excel', user_id=user_id)
         db.session.add(settings)
         db.session.commit()
     return settings
@@ -22,7 +23,7 @@ def list_expense():
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
     
-    query = Expense.query
+    query = Expense.query.filter_by(user_id=session['user_id'])
     
     if search_query:
         query = query.filter(Expense.description.like(f"%{search_query}%") | Expense.category.like(f"%{search_query}%"))
@@ -75,7 +76,13 @@ def add_expense():
         amount = float(amount_str)
         date_val = datetime.strptime(date_str, '%Y-%m-%d').date()
         
-        new_expense = Expense(date=date_val, category=category, amount=amount, description=description)
+        new_expense = Expense(
+            date=date_val,
+            category=category,
+            amount=amount,
+            description=description,
+            user_id=session['user_id']
+        )
         db.session.add(new_expense)
         db.session.commit()
         
@@ -89,7 +96,7 @@ def add_expense():
 
 @expense_bp.route('/expense/edit/<int:id>', methods=['POST'])
 def edit_expense(id):
-    expense = Expense.query.get_or_404(id)
+    expense = Expense.query.filter_by(id=id, user_id=session['user_id']).first_or_404()
     try:
         date_str = request.form.get('date')
         category = request.form.get('category')
@@ -116,7 +123,7 @@ def edit_expense(id):
 
 @expense_bp.route('/expense/delete/<int:id>', methods=['POST'])
 def delete_expense(id):
-    expense = Expense.query.get_or_404(id)
+    expense = Expense.query.filter_by(id=id, user_id=session['user_id']).first_or_404()
     try:
         db.session.delete(expense)
         db.session.commit()

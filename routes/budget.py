@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from database.models import db, Budget, Expense, Settings
 from datetime import datetime, date
 from sqlalchemy import extract, func
@@ -6,9 +6,10 @@ from sqlalchemy import extract, func
 budget_bp = Blueprint('budget', __name__)
 
 def get_current_settings():
-    settings = Settings.query.first()
+    user_id = session.get('user_id')
+    settings = Settings.query.filter_by(user_id=user_id).first()
     if not settings:
-        settings = Settings(currency='USD', theme='light', export_preference='excel')
+        settings = Settings(currency='USD', theme='light', export_preference='excel', user_id=user_id)
         db.session.add(settings)
         db.session.commit()
     return settings
@@ -16,6 +17,7 @@ def get_current_settings():
 @budget_bp.route('/budget', methods=['GET'])
 def list_budget():
     settings = get_current_settings()
+    user_id = session['user_id']
     
     # Get active month filter, defaults to current month YYYY-MM
     selected_month = request.args.get('month', date.today().strftime('%Y-%m'))
@@ -28,16 +30,17 @@ def list_budget():
         month_val = date.today().month
 
     # Get budgets for selected month
-    budgets = Budget.query.filter(Budget.month == selected_month).all()
+    budgets = Budget.query.filter(Budget.month == selected_month, Budget.user_id == user_id).all()
     
     budget_details = []
     total_budget_limit = 0.0
     total_spent = 0.0
     
     for b in budgets:
-        # Calculate actual spending in this category for this month
+        # Calculate actual spending in this category for this month and user
         spent = db.session.query(func.sum(Expense.amount)).filter(
             Expense.category == b.category,
+            Expense.user_id == user_id,
             extract('year', Expense.date) == year_val,
             extract('month', Expense.date) == month_val
         ).scalar() or 0.0
@@ -79,10 +82,11 @@ def list_budget():
 
 @budget_bp.route('/budget/add', methods=['POST'])
 def add_budget():
+    user_id = session['user_id']
+    month = request.form.get('month')
     try:
         category = request.form.get('category')
         limit_amount_str = request.form.get('limit_amount')
-        month = request.form.get('month')
         
         if not category or not limit_amount_str or not month:
             flash("All fields are required.", "danger")
@@ -90,13 +94,18 @@ def add_budget():
             
         limit_amount = float(limit_amount_str)
         
-        # Check if budget already exists for this category and month
-        existing_budget = Budget.query.filter(Budget.category == category, Budget.month == month).first()
+        # Check if budget already exists for this category and month and user
+        existing_budget = Budget.query.filter(
+            Budget.category == category,
+            Budget.month == month,
+            Budget.user_id == user_id
+        ).first()
+        
         if existing_budget:
             flash(f"Budget for {category} in {month} already exists. You can edit it from the list.", "warning")
             return redirect(url_for('budget.list_budget', month=month))
             
-        new_budget = Budget(category=category, limit_amount=limit_amount, month=month)
+        new_budget = Budget(category=category, limit_amount=limit_amount, month=month, user_id=user_id)
         db.session.add(new_budget)
         db.session.commit()
         
@@ -110,7 +119,7 @@ def add_budget():
 
 @budget_bp.route('/budget/edit/<int:id>', methods=['POST'])
 def edit_budget(id):
-    budget = Budget.query.get_or_404(id)
+    budget = Budget.query.filter_by(id=id, user_id=session['user_id']).first_or_404()
     try:
         limit_amount_str = request.form.get('limit_amount')
         
@@ -130,7 +139,7 @@ def edit_budget(id):
 
 @budget_bp.route('/budget/delete/<int:id>', methods=['POST'])
 def delete_budget(id):
-    budget = Budget.query.get_or_404(id)
+    budget = Budget.query.filter_by(id=id, user_id=session['user_id']).first_or_404()
     month = budget.month
     try:
         db.session.delete(budget)

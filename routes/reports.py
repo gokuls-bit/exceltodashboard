@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, session
 from database.models import db, Income, Expense, Budget, SavingsGoal, Settings
 from datetime import datetime, date
 from sqlalchemy import extract, func, or_
@@ -6,9 +6,10 @@ from sqlalchemy import extract, func, or_
 reports_bp = Blueprint('reports', __name__)
 
 def get_current_settings():
-    settings = Settings.query.first()
+    user_id = session.get('user_id')
+    settings = Settings.query.filter_by(user_id=user_id).first()
     if not settings:
-        settings = Settings(currency='USD', theme='light', export_preference='excel')
+        settings = Settings(currency='USD', theme='light', export_preference='excel', user_id=user_id)
         db.session.add(settings)
         db.session.commit()
     return settings
@@ -16,6 +17,7 @@ def get_current_settings():
 @reports_bp.route('/reports', methods=['GET'])
 def view_reports():
     settings = get_current_settings()
+    user_id = session['user_id']
     
     # Report Parameters
     report_type = request.args.get('type', 'monthly')  # monthly, quarterly, yearly, custom
@@ -75,9 +77,9 @@ def view_reports():
         except ValueError:
             pass
 
-    # Fetch data
-    income_query = Income.query
-    expense_query = Expense.query
+    # Fetch data for active user
+    income_query = Income.query.filter_by(user_id=user_id)
+    expense_query = Expense.query.filter_by(user_id=user_id)
     
     if start_dt:
         income_query = income_query.filter(Income.date >= start_dt)
@@ -113,16 +115,22 @@ def view_reports():
     # If monthly, fetch that month's budget
     budget_limit = 0.0
     if report_type == 'monthly':
-        budget_limit = db.session.query(func.sum(Budget.limit_amount)).filter(Budget.month == selected_month).scalar() or 0.0
+        budget_limit = db.session.query(func.sum(Budget.limit_amount))\
+            .filter(Budget.user_id == user_id, Budget.month == selected_month).scalar() or 0.0
     elif report_type == 'quarterly':
         # Sum budgets for the three months of the quarter
-        year_str, q_str = selected_quarter.split('-Q')
-        q = int(q_str)
-        months = [f"{year_str}-0{q*3-2}", f"{year_str}-0{q*3-1}", f"{year_str}-0{q*3}"] if q*3-2 < 10 else [f"{year_str}-{q*3-2}", f"{year_str}-{q*3-1}", f"{year_str}-{q*3}"]
-        budget_limit = db.session.query(func.sum(Budget.limit_amount)).filter(Budget.month.in_(months)).scalar() or 0.0
+        try:
+            year_str, q_str = selected_quarter.split('-Q')
+            q = int(q_str)
+            months = [f"{year_str}-0{q*3-2}", f"{year_str}-0{q*3-1}", f"{year_str}-0{q*3}"] if q*3-2 < 10 else [f"{year_str}-{q*3-2}", f"{year_str}-{q*3-1}", f"{year_str}-{q*3}"]
+            budget_limit = db.session.query(func.sum(Budget.limit_amount))\
+                .filter(Budget.user_id == user_id, Budget.month.in_(months)).scalar() or 0.0
+        except ValueError:
+            pass
     elif report_type == 'yearly':
         # Sum budgets for all 12 months
-        budget_limit = db.session.query(func.sum(Budget.limit_amount)).filter(Budget.month.like(f"{selected_year}-%")).scalar() or 0.0
+        budget_limit = db.session.query(func.sum(Budget.limit_amount))\
+            .filter(Budget.user_id == user_id, Budget.month.like(f"{selected_year}-%")).scalar() or 0.0
         
     budget_adherence_status = "N/A"
     if budget_limit > 0:

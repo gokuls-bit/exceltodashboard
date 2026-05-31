@@ -1,4 +1,4 @@
-from flask import Blueprint, send_file, request, render_template, redirect, url_for, flash, jsonify
+from flask import Blueprint, send_file, request, render_template, redirect, url_for, flash, jsonify, session
 from database.models import db, Income, Expense, Budget, SavingsGoal, Settings
 from datetime import datetime, date
 import pandas as pd
@@ -11,21 +11,24 @@ import os
 export_bp = Blueprint('export', __name__)
 
 def get_current_settings():
-    settings = Settings.query.first()
+    user_id = session.get('user_id')
+    settings = Settings.query.filter_by(user_id=user_id).first()
     if not settings:
-        settings = Settings(currency='USD', theme='light', export_preference='excel')
+        settings = Settings(currency='USD', theme='light', export_preference='excel', user_id=user_id)
         db.session.add(settings)
         db.session.commit()
     return settings
 
-# Financial score helper for Power BI export
-def calculate_historical_score(year, month):
+# Financial score helper for Power BI export (user specific)
+def calculate_historical_score(user_id, year, month):
     # Fetch metrics for that month
     inc_sum = db.session.query(db.func.sum(Income.amount)).filter(
+        Income.user_id == user_id,
         db.extract('year', Income.date) == year,
         db.extract('month', Income.date) == month
     ).scalar() or 0.0
     exp_sum = db.session.query(db.func.sum(Expense.amount)).filter(
+        Expense.user_id == user_id,
         db.extract('year', Expense.date) == year,
         db.extract('month', Expense.date) == month
     ).scalar() or 0.0
@@ -48,12 +51,13 @@ def calculate_historical_score(year, month):
 @export_bp.route('/export/excel')
 def export_excel():
     settings = get_current_settings()
+    user_id = session['user_id']
     
-    # 1. Fetch Data
-    incomes = Income.query.order_by(Income.date.desc()).all()
-    expenses = Expense.query.order_by(Expense.date.desc()).all()
-    budgets = Budget.query.order_by(Budget.month.desc()).all()
-    savings = SavingsGoal.query.all()
+    # 1. Fetch Data for user
+    incomes = Income.query.filter_by(user_id=user_id).order_by(Income.date.desc()).all()
+    expenses = Expense.query.filter_by(user_id=user_id).order_by(Expense.date.desc()).all()
+    budgets = Budget.query.filter_by(user_id=user_id).order_by(Budget.month.desc()).all()
+    savings = SavingsGoal.query.filter_by(user_id=user_id).all()
     
     # Create Unified Transactions
     tx_list = []
@@ -273,9 +277,11 @@ def export_excel():
 
 @export_bp.route('/export/tableau')
 def export_tableau():
+    user_id = session['user_id']
+    
     # Columns: Date, Income, Expense, Category, Budget, Savings, Balance, Month, Year
-    incomes = Income.query.order_by(Income.date.asc()).all()
-    expenses = Expense.query.order_by(Expense.date.asc()).all()
+    incomes = Income.query.filter_by(user_id=user_id).order_by(Income.date.asc()).all()
+    expenses = Expense.query.filter_by(user_id=user_id).order_by(Expense.date.asc()).all()
     
     # Calculate running balance and compile list
     txs = []
@@ -298,12 +304,17 @@ def export_tableau():
         # Get category budget
         budget_limit = 0.0
         if t['type'] == 'expense':
-            b = Budget.query.filter(Budget.category == t['category'], Budget.month == month_num_str).first()
+            b = Budget.query.filter(
+                Budget.category == t['category'],
+                Budget.month == month_num_str,
+                Budget.user_id == user_id
+            ).first()
             if b:
                 budget_limit = b.limit_amount
                 
         # Total Savings Goals Accumulated
-        total_savings = db.session.query(db.func.sum(SavingsGoal.current_amount)).scalar() or 0.0
+        total_savings = db.session.query(db.func.sum(SavingsGoal.current_amount))\
+            .filter(SavingsGoal.user_id == user_id).scalar() or 0.0
         
         data.append({
             'Date': t['date'].strftime('%Y-%m-%d'),
@@ -317,7 +328,11 @@ def export_tableau():
             'Year': year_val
         })
         
-    df = pd.DataFrame(data)
+    if not data:
+        # Avoid empty DataFrame error, create a dummy structure
+        df = pd.DataFrame(columns=['Date', 'Income', 'Expense', 'Category', 'Budget', 'Savings', 'Balance', 'Month', 'Year'])
+    else:
+        df = pd.DataFrame(data)
     
     # Return as CSV
     csv_buf = io.StringIO()
@@ -332,9 +347,11 @@ def export_tableau():
 
 @export_bp.route('/export/powerbi')
 def export_powerbi():
+    user_id = session['user_id']
+    
     # Columns: Transaction ID, Date, Month, Year, Income, Expense, Category, Budget, Savings, Balance, Financial Score
-    incomes = Income.query.order_by(Income.date.asc()).all()
-    expenses = Expense.query.order_by(Expense.date.asc()).all()
+    incomes = Income.query.filter_by(user_id=user_id).order_by(Income.date.asc()).all()
+    expenses = Expense.query.filter_by(user_id=user_id).order_by(Expense.date.asc()).all()
     
     txs = []
     for i in incomes:
@@ -356,15 +373,20 @@ def export_powerbi():
         # Get category budget
         budget_limit = 0.0
         if t['type'] == 'expense':
-            b = Budget.query.filter(Budget.category == t['category'], Budget.month == month_num_str).first()
+            b = Budget.query.filter(
+                Budget.category == t['category'],
+                Budget.month == month_num_str,
+                Budget.user_id == user_id
+            ).first()
             if b:
                 budget_limit = b.limit_amount
                 
         # Total Savings Goal Accumulated
-        total_savings = db.session.query(db.func.sum(SavingsGoal.current_amount)).scalar() or 0.0
+        total_savings = db.session.query(db.func.sum(SavingsGoal.current_amount))\
+            .filter(SavingsGoal.user_id == user_id).scalar() or 0.0
         
         # Calculate score for that month/year
-        score = calculate_historical_score(year_val, t['date'].month)
+        score = calculate_historical_score(user_id, year_val, t['date'].month)
         
         data.append({
             'Transaction ID': f"TX-{idx:05d}",
@@ -380,7 +402,10 @@ def export_powerbi():
             'Financial Score': score
         })
         
-    df = pd.DataFrame(data)
+    if not data:
+        df = pd.DataFrame(columns=['Transaction ID', 'Date', 'Month', 'Year', 'Income', 'Expense', 'Category', 'Budget', 'Savings', 'Balance', 'Financial Score'])
+    else:
+        df = pd.DataFrame(data)
     
     csv_buf = io.StringIO()
     df.to_csv(csv_buf, index=False)
@@ -396,6 +421,7 @@ def export_powerbi():
 @export_bp.route('/import', methods=['GET', 'POST'])
 def import_data():
     settings = get_current_settings()
+    user_id = session['user_id']
     
     if request.method == 'POST':
         file = request.files.get('file')
@@ -456,10 +482,10 @@ def import_data():
                     
                     if import_type == 'income':
                         source = str(row['source']).strip()
-                        new_row = Income(date=parsed_date, source=source, amount=amount, description=desc)
+                        new_row = Income(date=parsed_date, source=source, amount=amount, description=desc, user_id=user_id)
                     else:
                         cat = str(row['category']).strip()
-                        new_row = Expense(date=parsed_date, category=cat, amount=amount, description=desc)
+                        new_row = Expense(date=parsed_date, category=cat, amount=amount, description=desc, user_id=user_id)
                         
                     db.session.add(new_row)
                     success_count += 1

@@ -1,13 +1,14 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from database.models import db, SavingsGoal, Settings
 from datetime import datetime
 
 savings_bp = Blueprint('savings', __name__)
 
 def get_current_settings():
-    settings = Settings.query.first()
+    user_id = session.get('user_id')
+    settings = Settings.query.filter_by(user_id=user_id).first()
     if not settings:
-        settings = Settings(currency='USD', theme='light', export_preference='excel')
+        settings = Settings(currency='USD', theme='light', export_preference='excel', user_id=user_id)
         db.session.add(settings)
         db.session.commit()
     return settings
@@ -15,7 +16,8 @@ def get_current_settings():
 @savings_bp.route('/savings', methods=['GET'])
 def list_savings():
     settings = get_current_settings()
-    goals = SavingsGoal.query.order_by(SavingsGoal.id.desc()).all()
+    user_id = session['user_id']
+    goals = SavingsGoal.query.filter_by(user_id=user_id).order_by(SavingsGoal.id.desc()).all()
     
     # Calculate summary metrics
     total_target = sum(g.target_amount for g in goals)
@@ -37,6 +39,7 @@ def list_savings():
 
 @savings_bp.route('/savings/add', methods=['POST'])
 def add_savings_goal():
+    user_id = session['user_id']
     try:
         name = request.form.get('name')
         target_amount_str = request.form.get('target_amount')
@@ -58,7 +61,8 @@ def add_savings_goal():
             name=name,
             target_amount=target_amount,
             current_amount=current_amount,
-            target_date=target_date
+            target_date=target_date,
+            user_id=user_id
         )
         db.session.add(new_goal)
         db.session.commit()
@@ -73,7 +77,7 @@ def add_savings_goal():
 
 @savings_bp.route('/savings/edit/<int:id>', methods=['POST'])
 def edit_savings_goal(id):
-    goal = SavingsGoal.query.get_or_404(id)
+    goal = SavingsGoal.query.filter_by(id=id, user_id=session['user_id']).first_or_404()
     try:
         name = request.form.get('name')
         target_amount_str = request.form.get('target_amount')
@@ -104,7 +108,7 @@ def edit_savings_goal(id):
 
 @savings_bp.route('/savings/delete/<int:id>', methods=['POST'])
 def delete_savings_goal(id):
-    goal = SavingsGoal.query.get_or_404(id)
+    goal = SavingsGoal.query.filter_by(id=id, user_id=session['user_id']).first_or_404()
     try:
         db.session.delete(goal)
         db.session.commit()
