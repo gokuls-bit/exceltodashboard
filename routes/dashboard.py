@@ -150,19 +150,21 @@ def home():
     recent_transactions = []
     for inc in incomes:
         recent_transactions.append({
+            'id': inc.id,
             'type': 'Income',
             'date': inc.date,
             'category_or_source': inc.source,
             'amount': inc.amount,
-            'description': inc.description or 'No description'
+            'description': inc.description or ''
         })
     for exp in expenses:
         recent_transactions.append({
+            'id': exp.id,
             'type': 'Expense',
             'date': exp.date,
             'category_or_source': exp.category,
             'amount': exp.amount,
-            'description': exp.description or 'No description'
+            'description': exp.description or ''
         })
         
     recent_transactions.sort(key=lambda x: x['date'], reverse=True)

@@ -34,11 +34,16 @@
             {% if current_user %}
             <div class="profile-card">
                 <div class="profile-avatar">
-                    <span class="avatar-placeholder">{{ current_user.username[:2].upper() }}</span>
+                    <span class="avatar-placeholder {% if settings and settings.is_premium %}avatar-pro{% endif %}">{{ current_user.username[:2].upper() }}</span>
                 </div>
                 <div class="profile-info">
-                    <h6 class="profile-name">{{ current_user.username }}</h6>
-                    <span class="profile-role">Student Account</span>
+                    <h6 class="profile-name">
+                        {{ current_user.username }}
+                        {% if settings and settings.is_premium %}
+                            <span class="badge bg-warning text-dark fs-8 ms-1 fw-bold" style="padding: 2px 6px; font-size: 0.7rem;"><i class="bi bi-gem"></i> PRO</span>
+                        {% endif %}
+                    </h6>
+                    <span class="profile-role">{% if settings and settings.is_premium %}Pro Student Account{% else %}Student Account{% endif %}</span>
                 </div>
             </div>
             {% endif %}
@@ -90,12 +95,23 @@
             </nav>
             
             <!-- Upgrade Plan Promo -->
+            {% if not settings or not settings.is_premium %}
             <div class="sidebar-promo">
                 <i class="bi bi-gem promo-icon"></i>
                 <h5>Go Pro</h5>
                 <p>Unlock detailed multi-currency sheets & custom data charts.</p>
-                <a href="#" class="btn btn-promo btn-sm">Upgrade Plan <i class="bi bi-arrow-right"></i></a>
+                <button type="button" class="btn btn-promo btn-sm w-100" data-bs-toggle="modal" data-bs-target="#upgradeModal">Upgrade Plan <i class="bi bi-arrow-right"></i></button>
             </div>
+            {% else %}
+            <div class="sidebar-promo border border-success-subtle text-center text-success py-3 px-2 rounded-4" style="background-color: rgba(16, 185, 129, 0.1);">
+                <i class="bi bi-gem fs-4 text-success mb-2 d-block"></i>
+                <h6 class="fw-bold mb-1 text-success">PRO Active</h6>
+                <p class="text-secondary small mb-3">Thank you for supporting us!</p>
+                <form action="{{ url_for('dashboard.upgrade_pro') }}" method="POST" class="m-0">
+                    <button type="submit" class="btn btn-outline-danger btn-sm w-100 py-1" style="font-size: 0.8rem;">Downgrade to Standard</button>
+                </form>
+            </div>
+            {% endif %}
         </aside>
         
         <!-- Main Content Wrapper -->
@@ -170,6 +186,65 @@
             weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
         });
     </script>
+    <!-- Modal: Upgrade to Pro -->
+    <div class="modal fade" id="upgradeModal" tabindex="-1" aria-labelledby="upgradeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style="background-color: var(--card-bg); color: var(--text-primary);">
+                <div class="modal-header border-0 py-3 text-white" style="background: linear-gradient(135deg, #10B981 0%, #3B82F6 100%);">
+                    <h5 class="modal-title fw-bold" id="upgradeModalLabel"><i class="bi bi-gem"></i> Upgrade to FinFlow Pro</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="text-center mb-4">
+                        <div class="fs-1 text-warning mb-2"><i class="bi bi-stars"></i></div>
+                        <h4 class="fw-bold">Go Beyond Limits</h4>
+                        <p class="text-secondary small">Unlock advanced features designed to accelerate your financial growth.</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center mb-3">
+                            <span class="badge bg-success-subtle text-success me-3 p-2 rounded-3"><i class="bi bi-check2 fs-5"></i></span>
+                            <div>
+                                <h6 class="fw-bold m-0 text-start">Multi-Currency Accounts</h6>
+                                <p class="text-secondary small m-0 text-start">Switch your workspace currency dynamically (EUR, GBP, INR, JPY).</p>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center mb-3">
+                            <span class="badge bg-success-subtle text-success me-3 p-2 rounded-3"><i class="bi bi-check2 fs-5"></i></span>
+                            <div>
+                                <h6 class="fw-bold m-0 text-start">Advanced Data Integrations</h6>
+                                <p class="text-secondary small m-0 text-start">Import and auto-detect unified spreadsheets directly from external exports.</p>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="badge bg-success-subtle text-success me-3 p-2 rounded-3"><i class="bi bi-check2 fs-5"></i></span>
+                            <div>
+                                <h6 class="fw-bold m-0 text-start">Priority Support & Ad-Free</h6>
+                                <p class="text-secondary small m-0 text-start">Enjoy clean dashboard layouts with zero upgrade banners.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card border-0 p-3 rounded-4 mb-4" style="background-color: var(--border-color);">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="fw-bold m-0">$4.99 <span class="fs-7 text-secondary fw-normal">/ month</span></h5>
+                                <span class="badge bg-warning text-dark font-monospace fs-8">STUDENT DISCOUNT</span>
+                            </div>
+                            <span class="text-success small fw-bold">Save 50%</span>
+                        </div>
+                    </div>
+                    
+                    <form action="{{ url_for('dashboard.upgrade_pro') }}" method="POST">
+                        <button type="submit" class="btn btn-primary-custom w-100 py-2.5 rounded-3 fw-bold bg-gradient-custom text-white border-0" style="background: linear-gradient(135deg, #10B981 0%, #3B82F6 100%);">
+                            Upgrade My Account Now <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>
