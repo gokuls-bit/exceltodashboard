@@ -425,7 +425,7 @@ def import_data():
     
     if request.method == 'POST':
         file = request.files.get('file')
-        import_type = request.form.get('type') # 'income' or 'expense'
+        import_type = request.form.get('type') # 'income', 'expense', or 'unified'
         
         if not file or file.filename == '':
             flash("No file selected for import.", "danger")
@@ -444,54 +444,143 @@ def import_data():
                 flash("Unsupported file format. Please upload a CSV or Excel (.xlsx) file.", "danger")
                 return redirect(url_for('export.import_data'))
                 
-            # Normalize headers
-            df.columns = [c.strip().lower() for c in df.columns]
-            
-            # Check required columns: 'date', 'amount', and 'category' or 'source'
-            req_cols = ['date', 'amount']
-            if import_type == 'income':
-                req_cols.append('source')
-            else:
-                req_cols.append('category')
+            # Create a case-insensitive column mapping
+            col_map = {}
+            for col in df.columns:
+                cleaned = str(col).strip().lower()
+                col_map[cleaned] = col
                 
-            missing_cols = [col for col in req_cols if col not in df.columns]
-            if missing_cols:
-                flash(f"Missing required columns in upload: {', '.join(missing_cols)}", "danger")
+            # Detect dates
+            date_key = None
+            for candidate in ['date', 'transaction date', 'trans_date', 'date_str', 'timestamp']:
+                if candidate in col_map:
+                    date_key = col_map[candidate]
+                    break
+                    
+            if not date_key:
+                flash("Missing date column. Please ensure your file has a date column.", "danger")
                 return redirect(url_for('export.import_data'))
                 
-            # Perform import
+            # Detect description
+            desc_key = None
+            for candidate in ['description', 'desc', 'notes', 'memo', 'details']:
+                if candidate in col_map:
+                    desc_key = col_map[candidate]
+                    break
+                    
+            # Detect category/source
+            cat_key = None
+            for candidate in ['category', 'source', 'category/source', 'type', 'category_or_source']:
+                if candidate in col_map:
+                    cat_key = col_map[candidate]
+                    break
+
+            # Check if unified mode
+            is_unified = (import_type == 'unified') or ('income' in col_map and 'expense' in col_map)
+            
             success_count = 0
             fail_count = 0
             
-            for idx, row in df.iterrows():
-                try:
-                    # Parse date
-                    raw_date = row['date']
-                    if isinstance(raw_date, pd.Timestamp):
-                        parsed_date = raw_date.date()
-                    else:
-                        parsed_date = pd.to_datetime(raw_date).date()
+            if is_unified:
+                # Unified import expects 'income' and 'expense' columns
+                income_col = col_map.get('income')
+                expense_col = col_map.get('expense')
+                
+                if not income_col and not expense_col:
+                    flash("Unified import requires 'Income' and/or 'Expense' columns.", "danger")
+                    return redirect(url_for('export.import_data'))
+                    
+                for idx, row in df.iterrows():
+                    try:
+                        # Parse date
+                        raw_date = row[date_key]
+                        if isinstance(raw_date, pd.Timestamp):
+                            parsed_date = raw_date.date()
+                        else:
+                            parsed_date = pd.to_datetime(raw_date).date()
+                            
+                        desc = str(row[desc_key]) if desc_key and not pd.isna(row[desc_key]) else ''
+                        cat_or_source = str(row[cat_key]).strip() if cat_key and not pd.isna(row[cat_key]) else 'Other'
                         
-                    # Parse amount
-                    amount = float(row['amount'])
-                    if pd.isna(amount) or amount < 0:
+                        added_any = False
+                        
+                        # Process income
+                        if income_col and not pd.isna(row[income_col]):
+                            inc_amt = float(row[income_col])
+                            if inc_amt > 0:
+                                new_inc = Income(date=parsed_date, source=cat_or_source, amount=inc_amt, description=desc, user_id=user_id)
+                                db.session.add(new_inc)
+                                added_any = True
+                                
+                        # Process expense
+                        if expense_col and not pd.isna(row[expense_col]):
+                            exp_amt = float(row[expense_col])
+                            if exp_amt > 0:
+                                new_exp = Expense(date=parsed_date, category=cat_or_source, amount=exp_amt, description=desc, user_id=user_id)
+                                db.session.add(new_exp)
+                                added_any = True
+                                
+                        if added_any:
+                            success_count += 1
+                        else:
+                            fail_count += 1
+                    except Exception:
                         fail_count += 1
-                        continue
-                        
-                    desc = str(row['description']) if 'description' in df.columns and not pd.isna(row['description']) else ''
+            else:
+                # Standard import (single type)
+                # Find amount column
+                amount_col = None
+                amt_candidates = ['amount', 'value', 'val']
+                if import_type == 'income':
+                    amt_candidates.append('income')
+                else:
+                    amt_candidates.append('expense')
                     
-                    if import_type == 'income':
-                        source = str(row['source']).strip()
-                        new_row = Income(date=parsed_date, source=source, amount=amount, description=desc, user_id=user_id)
-                    else:
-                        cat = str(row['category']).strip()
-                        new_row = Expense(date=parsed_date, category=cat, amount=amount, description=desc, user_id=user_id)
+                for candidate in amt_candidates:
+                    if candidate in col_map:
+                        amount_col = col_map[candidate]
+                        break
                         
-                    db.session.add(new_row)
-                    success_count += 1
-                except Exception:
-                    fail_count += 1
+                if not amount_col:
+                    flash(f"Amount column not found. Please ensure the file has a column like 'Amount' or '{'Income' if import_type == 'income' else 'Expense'}'.", "danger")
+                    return redirect(url_for('export.import_data'))
                     
+                # Find category/source
+                cat_col = col_map.get('category') or col_map.get('source') or col_map.get('category/source') or col_map.get('type')
+                
+                # Check required columns
+                if not cat_col:
+                    flash(f"Category or Source column not found. Please ensure your file contains a category/source column.", "danger")
+                    return redirect(url_for('export.import_data'))
+                    
+                for idx, row in df.iterrows():
+                    try:
+                        # Parse date
+                        raw_date = row[date_key]
+                        if isinstance(raw_date, pd.Timestamp):
+                            parsed_date = raw_date.date()
+                        else:
+                            parsed_date = pd.to_datetime(raw_date).date()
+                            
+                        # Parse amount
+                        amount = float(row[amount_col])
+                        if pd.isna(amount) or amount < 0:
+                            fail_count += 1
+                            continue
+                            
+                        desc = str(row[desc_key]) if desc_key and not pd.isna(row[desc_key]) else ''
+                        cat_or_source = str(row[cat_col]).strip()
+                        
+                        if import_type == 'income':
+                            new_row = Income(date=parsed_date, source=cat_or_source, amount=amount, description=desc, user_id=user_id)
+                        else:
+                            new_row = Expense(date=parsed_date, category=cat_or_source, amount=amount, description=desc, user_id=user_id)
+                            
+                        db.session.add(new_row)
+                        success_count += 1
+                    except Exception:
+                        fail_count += 1
+                        
             db.session.commit()
             flash(f"Import finished. Successfully imported {success_count} records. Failed records: {fail_count}.", "success" if fail_count == 0 else "warning")
             return redirect(url_for('dashboard.home'))

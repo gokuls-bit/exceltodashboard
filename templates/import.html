@@ -15,8 +15,9 @@
                 <div class="mb-4">
                     <label for="type" class="form-label small fw-bold text-secondary">Dataset Type</label>
                     <select name="type" id="type" class="form-select" required>
-                        <option value="income">Income Records</option>
-                        <option value="expense">Expense Records</option>
+                        <option value="unified">Unified Dataset (Auto-Detect)</option>
+                        <option value="income">Income Records Only</option>
+                        <option value="expense">Expense Records Only</option>
                     </select>
                 </div>
                 
@@ -40,6 +41,46 @@
                 To ensure a successful import, please verify that your spreadsheet columns match the exact headers listed below.
             </p>
             
+            <div class="mb-3">
+                <h6 class="fw-bold text-primary small mb-2"><i class="bi bi-arrow-left-right"></i> Unified Dataset Headers (Auto-Detect)</h6>
+                <table class="table table-bordered table-sm small text-secondary">
+                    <thead>
+                        <tr class="table-light">
+                            <th>Column Name</th>
+                            <th>Requirement</th>
+                            <th>Description / Format</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>date</code></td>
+                            <td>Required</td>
+                            <td>Format: <code>YYYY-MM-DD</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>income</code></td>
+                            <td>Optional</td>
+                            <td>Positive numeric value for income rows</td>
+                        </tr>
+                        <tr>
+                            <td><code>expense</code></td>
+                            <td>Optional</td>
+                            <td>Positive numeric value for expense rows</td>
+                        </tr>
+                        <tr>
+                            <td><code>category</code> / <code>source</code></td>
+                            <td>Optional</td>
+                            <td>Type of transaction (e.g. Food, Freelancing)</td>
+                        </tr>
+                        <tr>
+                            <td><code>description</code></td>
+                            <td>Optional</td>
+                            <td>Text details</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
             <div class="mb-3">
                 <h6 class="fw-bold text-success small mb-2"><i class="bi bi-arrow-down-left-circle"></i> Income Sheet Headers</h6>
                 <table class="table table-bordered table-sm small text-secondary">

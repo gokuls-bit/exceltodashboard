@@ -15,8 +15,8 @@
             </div>
             <h2 class="card-value">{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(current_balance) }}</h2>
             <div class="mt-4">
-                <a href="{{ url_for('income.list_income') }}" class="btn btn-deposit btn-sm"><i class="bi bi-plus-lg"></i> Add Income</a>
-                <a href="{{ url_for('expense.list_expense') }}" class="btn btn-send btn-sm"><i class="bi bi-dash-lg"></i> Add Expense</a>
+                <button type="button" class="btn btn-deposit btn-sm" data-bs-toggle="modal" data-bs-target="#addIncomeModal"><i class="bi bi-plus-lg"></i> Add Income</button>
+                <button type="button" class="btn btn-send btn-sm" data-bs-toggle="modal" data-bs-target="#addExpenseModal"><i class="bi bi-dash-lg"></i> Add Expense</button>
             </div>
         </div>
     </div>
@@ -171,6 +171,7 @@
                             <th>Category / Source</th>
                             <th>Description</th>
                             <th>Amount</th>
+                            <th class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -188,15 +189,52 @@
                                 </td>
                                 <td>{{ tx.date.strftime('%Y-%m-%d') }}</td>
                                 <td class="fw-bold">{{ tx.category_or_source }}</td>
-                                <td class="text-secondary">{{ tx.description }}</td>
+                                <td class="text-secondary">{{ tx.description or '-' }}</td>
                                 <td class="fw-bold {% if tx.type == 'Income' %}text-success{% else %}text-danger{% endif %}">
                                     {% if tx.type == 'Income' %}+{% else %}-{% endif %}{{ settings.currency if settings else '$' }}{{ "{:,.2f}".format(tx.amount) }}
+                                </td>
+                                <td class="text-end">
+                                    <div class="d-inline-flex gap-2">
+                                        {% if tx.type == 'Income' %}
+                                            <button class="btn btn-sm btn-outline-primary border-0 rounded-3" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#editIncomeModal"
+                                                    data-id="{{ tx.id }}"
+                                                    data-date="{{ tx.date.strftime('%Y-%m-%d') }}"
+                                                    data-source="{{ tx.category_or_source }}"
+                                                    data-amount="{{ tx.amount }}"
+                                                    data-description="{{ tx.description or '' }}">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+                                            <form action="{{ url_for('income.delete_income', id=tx.id) }}" method="POST" class="m-0" onsubmit="return confirm('Are you sure you want to delete this income record?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger border-0 rounded-3">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        {% else %}
+                                            <button class="btn btn-sm btn-outline-primary border-0 rounded-3" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#editExpenseModal"
+                                                    data-id="{{ tx.id }}"
+                                                    data-date="{{ tx.date.strftime('%Y-%m-%d') }}"
+                                                    data-category="{{ tx.category_or_source }}"
+                                                    data-amount="{{ tx.amount }}"
+                                                    data-description="{{ tx.description or '' }}">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+                                            <form action="{{ url_for('expense.delete_expense', id=tx.id) }}" method="POST" class="m-0" onsubmit="return confirm('Are you sure you want to delete this expense record?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger border-0 rounded-3">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="5" class="text-center py-4 text-secondary">
+                                <td colspan="6" class="text-center py-4 text-secondary">
                                     No transaction records found. Try adding some income or expenses!
                                 </td>
                             </tr>
@@ -208,6 +246,202 @@
     </div>
 </div>
 {% endblock %}
+
+<!-- Modal: Add Income -->
+<div class="modal fade" id="addIncomeModal" tabindex="-1" aria-labelledby="addIncomeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-primary); border-color: var(--border-color);">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold" id="addIncomeModalLabel">Add Income Record</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('income.add_income') }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="add-date" class="form-label small fw-bold">Date</label>
+                        <input type="date" name="date" id="add-date" class="form-control" required value="{{ date.today().strftime('%Y-%m-%d') }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="add-source" class="form-label small fw-bold">Source</label>
+                        <select name="source" id="add-source" class="form-select" required>
+                            <option value="Part-Time Income">Part-Time Income</option>
+                            <option value="Freelancing">Freelancing</option>
+                            <option value="Scholarship">Scholarship</option>
+                            <option value="Pocket Money">Pocket Money</option>
+                            <option value="Internship Stipend">Internship Stipend</option>
+                            <option value="Business Income">Business Income</option>
+                            <option value="Other Income">Other Income</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="add-amount" class="form-label small fw-bold">Amount</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-transparent" style="color: var(--text-muted); border-color: var(--border-color);">{{ settings.currency if settings else '$' }}</span>
+                            <input type="number" step="0.01" name="amount" id="add-amount" class="form-control" placeholder="0.00" required min="0">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="add-description" class="form-label small fw-bold">Description (Optional)</label>
+                        <textarea name="description" id="add-description" rows="2" class="form-control" placeholder="E.g., Web dev project payment"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-custom">Save Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add Expense -->
+<div class="modal fade" id="addExpenseModal" tabindex="-1" aria-labelledby="addExpenseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-primary); border-color: var(--border-color);">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold" id="addExpenseModalLabel">Add Expense Record</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('expense.add_expense') }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="add-exp-date" class="form-label small fw-bold">Date</label>
+                        <input type="date" name="date" id="add-exp-date" class="form-control" required value="{{ date.today().strftime('%Y-%m-%d') }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="add-category" class="form-label small fw-bold">Category</label>
+                        <select name="category" id="add-category" class="form-select" required>
+                            <option value="Food">Food</option>
+                            <option value="Transport">Transport</option>
+                            <option value="Rent">Rent</option>
+                            <option value="Education">Education</option>
+                            <option value="Books">Books</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Entertainment">Entertainment</option>
+                            <option value="Health">Health</option>
+                            <option value="Travel">Travel</option>
+                            <option value="Subscriptions">Subscriptions</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="add-exp-amount" class="form-label small fw-bold">Amount</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-transparent" style="color: var(--text-muted); border-color: var(--border-color);">{{ settings.currency if settings else '$' }}</span>
+                            <input type="number" step="0.01" name="amount" id="add-exp-amount" class="form-control" placeholder="0.00" required min="0">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="add-exp-description" class="form-label small fw-bold">Description (Optional)</label>
+                        <textarea name="description" id="add-exp-description" rows="2" class="form-control" placeholder="E.g., Groceries shopping"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-custom bg-danger border-0">Save Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Edit Income -->
+<div class="modal fade" id="editIncomeModal" tabindex="-1" aria-labelledby="editIncomeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-primary); border-color: var(--border-color);">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold" id="editIncomeModalLabel">Edit Income Record</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit-date" class="form-label small fw-bold">Date</label>
+                        <input type="date" name="date" id="edit-date" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-source" class="form-label small fw-bold">Source</label>
+                        <select name="source" id="edit-source" class="form-select" required>
+                            <option value="Part-Time Income">Part-Time Income</option>
+                            <option value="Freelancing">Freelancing</option>
+                            <option value="Scholarship">Scholarship</option>
+                            <option value="Pocket Money">Pocket Money</option>
+                            <option value="Internship Stipend">Internship Stipend</option>
+                            <option value="Business Income">Business Income</option>
+                            <option value="Other Income">Other Income</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-amount" class="form-label small fw-bold">Amount</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-transparent" style="color: var(--text-muted); border-color: var(--border-color);">{{ settings.currency if settings else '$' }}</span>
+                            <input type="number" step="0.01" name="amount" id="edit-amount" class="form-control" required min="0">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-description" class="form-label small fw-bold">Description (Optional)</label>
+                        <textarea name="description" id="edit-description" rows="2" class="form-control"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-custom">Update Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Edit Expense -->
+<div class="modal fade" id="editExpenseModal" tabindex="-1" aria-labelledby="editExpenseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-primary); border-color: var(--border-color);">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold" id="editExpenseModalLabel">Edit Expense Record</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit-exp-date" class="form-label small fw-bold">Date</label>
+                        <input type="date" name="date" id="edit-date" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-category" class="form-label small fw-bold">Category</label>
+                        <select name="category" id="edit-category" class="form-select" required>
+                            <option value="Food">Food</option>
+                            <option value="Transport">Transport</option>
+                            <option value="Rent">Rent</option>
+                            <option value="Education">Education</option>
+                            <option value="Books">Books</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Entertainment">Entertainment</option>
+                            <option value="Health">Health</option>
+                            <option value="Travel">Travel</option>
+                            <option value="Subscriptions">Subscriptions</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-exp-amount" class="form-label small fw-bold">Amount</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-transparent" style="color: var(--text-muted); border-color: var(--border-color);">{{ settings.currency if settings else '$' }}</span>
+                            <input type="number" step="0.01" name="amount" id="edit-amount" class="form-control" required min="0">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-exp-description" class="form-label small fw-bold">Description (Optional)</label>
+                        <textarea name="description" id="edit-description" rows="2" class="form-control"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-custom bg-danger border-0">Update Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
