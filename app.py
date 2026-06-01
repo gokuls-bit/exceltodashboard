@@ -35,6 +35,18 @@ def create_app():
     
     with app.app_context():
         db.create_all()
+        # Dynamic schema upgrade for settings table
+        try:
+            db.session.execute(db.text("SELECT is_premium FROM settings LIMIT 1"))
+        except Exception:
+            db.session.rollback()
+            try:
+                db.session.execute(db.text("ALTER TABLE settings ADD COLUMN is_premium BOOLEAN DEFAULT 0 NOT NULL"))
+                db.session.commit()
+                print("Database migrated successfully: settings.is_premium column added.")
+            except Exception as e:
+                db.session.rollback()
+                print(f"Error migrating database settings.is_premium: {e}")
             
     return app
 

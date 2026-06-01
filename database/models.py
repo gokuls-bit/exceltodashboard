@@ -105,6 +105,7 @@ class Settings(db.Model):
     currency = db.Column(db.String(10), nullable=False, default='USD')
     theme = db.Column(db.String(10), nullable=False, default='light')
     export_preference = db.Column(db.String(20), nullable=False, default='excel')
+    is_premium = db.Column(db.Boolean, default=False, nullable=False)
 
     def to_dict(self):
         return {
@@ -112,5 +113,6 @@ class Settings(db.Model):
             'user_id': self.user_id,
             'currency': self.currency,
             'theme': self.theme,
-            'export_preference': self.export_preference
+            'export_preference': self.export_preference,
+            'is_premium': self.is_premium
         }
