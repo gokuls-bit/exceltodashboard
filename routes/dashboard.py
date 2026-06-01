@@ -493,3 +493,14 @@ def view_settings():
             return redirect(url_for('dashboard.home'))
 
     return render_template('settings.html', settings=settings)
+
+@dashboard_bp.route('/upgrade-pro', methods=['POST'])
+def upgrade_pro():
+    settings = get_current_settings()
+    settings.is_premium = not settings.is_premium
+    db.session.commit()
+    if settings.is_premium:
+        flash("Congratulations! You are now a PRO member! Thank you for supporting FinFlow.", "success")
+    else:
+        flash("Your account has been reverted to the Standard plan.", "warning")
+    return redirect(request.referrer or url_for('dashboard.home'))
