@@ -71,7 +71,7 @@ def add_expense():
         
         if not date_str or not category or not amount_str:
             flash("All fields except description are required.", "danger")
-            return redirect(url_for('expense.list_expense'))
+            return redirect(request.referrer or url_for('expense.list_expense'))
             
         amount = float(amount_str)
         date_val = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -92,7 +92,7 @@ def add_expense():
     except Exception as e:
         flash(f"An error occurred: {str(e)}", "danger")
         
-    return redirect(url_for('expense.list_expense'))
+    return redirect(request.referrer or url_for('expense.list_expense'))
 
 @expense_bp.route('/expense/edit/<int:id>', methods=['POST'])
 def edit_expense(id):
@@ -105,7 +105,7 @@ def edit_expense(id):
         
         if not date_str or not category or not amount_str:
             flash("All fields are required.", "danger")
-            return redirect(url_for('expense.list_expense'))
+            return redirect(request.referrer or url_for('expense.list_expense'))
             
         expense.amount = float(amount_str)
         expense.category = category
@@ -119,7 +119,7 @@ def edit_expense(id):
     except Exception as e:
         flash(f"An error occurred: {str(e)}", "danger")
         
-    return redirect(url_for('expense.list_expense'))
+    return redirect(request.referrer or url_for('expense.list_expense'))
 
 @expense_bp.route('/expense/delete/<int:id>', methods=['POST'])
 def delete_expense(id):
@@ -131,4 +131,4 @@ def delete_expense(id):
     except Exception as e:
         flash(f"An error occurred: {str(e)}", "danger")
         
-    return redirect(url_for('expense.list_expense'))
+    return redirect(request.referrer or url_for('expense.list_expense'))

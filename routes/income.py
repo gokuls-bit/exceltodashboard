@@ -71,7 +71,7 @@ def add_income():
         
         if not date_str or not source or not amount_str:
             flash("All fields except description are required.", "danger")
-            return redirect(url_for('income.list_income'))
+            return redirect(request.referrer or url_for('income.list_income'))
             
         amount = float(amount_str)
         date_val = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -92,7 +92,7 @@ def add_income():
     except Exception as e:
         flash(f"An error occurred: {str(e)}", "danger")
         
-    return redirect(url_for('income.list_income'))
+    return redirect(request.referrer or url_for('income.list_income'))
 
 @income_bp.route('/income/edit/<int:id>', methods=['POST'])
 def edit_income(id):
@@ -105,7 +105,7 @@ def edit_income(id):
         
         if not date_str or not source or not amount_str:
             flash("All fields are required.", "danger")
-            return redirect(url_for('income.list_income'))
+            return redirect(request.referrer or url_for('income.list_income'))
             
         income.amount = float(amount_str)
         income.source = source
@@ -119,7 +119,7 @@ def edit_income(id):
     except Exception as e:
         flash(f"An error occurred: {str(e)}", "danger")
         
-    return redirect(url_for('income.list_income'))
+    return redirect(request.referrer or url_for('income.list_income'))
 
 @income_bp.route('/income/delete/<int:id>', methods=['POST'])
 def delete_income(id):
@@ -131,4 +131,4 @@ def delete_income(id):
     except Exception as e:
         flash(f"An error occurred: {str(e)}", "danger")
         
-    return redirect(url_for('income.list_income'))
+    return redirect(request.referrer or url_for('income.list_income'))
