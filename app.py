@@ -11,12 +11,11 @@ from routes.reports import reports_bp
 from routes.export import export_bp
 
 def create_app():
-    # 1. Start building the foundation
+   
     app = Flask(__name__)
-    app.secret_key = "student-finance-key-1337" # The secret code for our clubhouse lock
+    app.secret_key = "student-finance-key-1337" 
     
-    # 2. Setup the "Memory Bank" (Database)
-    # We make sure the folder exists so we don't lose our notes!
+
     os.makedirs(app.instance_path, exist_ok=True)
     db_path = os.path.join(app.instance_path, 'finance.db')
     
