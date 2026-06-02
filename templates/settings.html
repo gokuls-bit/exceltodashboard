@@ -18,11 +18,16 @@
                     <label for="currency" class="form-label small fw-bold text-secondary">Currency Symbol</label>
                     <select name="currency" id="currency" class="form-select">
                         <option value="USD" {% if settings.currency == 'USD' or settings.currency == '$' %}selected{% endif %}>USD ($)</option>
-                        <option value="EUR" {% if settings.currency == 'EUR' or settings.currency == '€' %}selected{% endif %}>EUR (€)</option>
-                        <option value="GBP" {% if settings.currency == 'GBP' or settings.currency == '£' %}selected{% endif %}>GBP (£)</option>
-                        <option value="INR" {% if settings.currency == 'INR' or settings.currency == '₹' %}selected{% endif %}>INR (₹)</option>
-                        <option value="JPY" {% if settings.currency == 'JPY' or settings.currency == '¥' %}selected{% endif %}>JPY (¥)</option>
+                        <option value="EUR" {% if settings.currency == 'EUR' or settings.currency == '€' %}selected{% endif %} {% if not settings.is_premium %}disabled{% endif %}>EUR (€) {% if not settings.is_premium %}(PRO Only){% endif %}</option>
+                        <option value="GBP" {% if settings.currency == 'GBP' or settings.currency == '£' %}selected{% endif %} {% if not settings.is_premium %}disabled{% endif %}>GBP (£) {% if not settings.is_premium %}(PRO Only){% endif %}</option>
+                        <option value="INR" {% if settings.currency == 'INR' or settings.currency == '₹' %}selected{% endif %} {% if not settings.is_premium %}disabled{% endif %}>INR (₹) {% if not settings.is_premium %}(PRO Only){% endif %}</option>
+                        <option value="JPY" {% if settings.currency == 'JPY' or settings.currency == '¥' %}selected{% endif %} {% if not settings.is_premium %}disabled{% endif %}>JPY (¥) {% if not settings.is_premium %}(PRO Only){% endif %}</option>
                     </select>
+                    {% if not settings.is_premium %}
+                        <div class="form-text text-muted">
+                            Want to use other currencies? <a href="#" data-bs-toggle="modal" data-bs-target="#upgradeModal">Upgrade to Pro</a>.
+                        </div>
+                    {% endif %}
                 </div>
                 
                 <div class="mb-3">

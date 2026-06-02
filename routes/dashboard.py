@@ -296,6 +296,7 @@ def list_transactions():
     tx_list = []
     for inc in incomes:
         tx_list.append({
+            'id': inc.id,
             'type': 'Income',
             'date': inc.date,
             'category_or_source': inc.source,
@@ -304,6 +305,7 @@ def list_transactions():
         })
     for exp in expenses:
         tx_list.append({
+            'id': exp.id,
             'type': 'Expense',
             'date': exp.date,
             'category_or_source': exp.category,
@@ -380,6 +382,10 @@ def view_settings():
             theme = request.form.get('theme', 'light')
             export_pref = request.form.get('export_preference', 'excel')
             
+            if currency != settings.currency and currency != 'USD' and not settings.is_premium:
+                flash("Changing currency is a PRO feature. Please upgrade to Pro first!", "danger")
+                return redirect(url_for('dashboard.view_settings'))
+                
             settings.currency = currency
             settings.theme = theme
             settings.export_preference = export_pref

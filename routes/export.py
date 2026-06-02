@@ -83,6 +83,20 @@ def export_excel():
     output = io.BytesIO()
     wb = openpyxl.Workbook()
     
+    # Determine Excel currency format dynamically
+    if settings.currency in ['USD', '$']:
+        curr_format = '"$"#,##0.00'
+    elif settings.currency in ['EUR', '€']:
+        curr_format = '"€"#,##0.00'
+    elif settings.currency in ['GBP', '£']:
+        curr_format = '"£"#,##0.00'
+    elif settings.currency in ['INR', '₹']:
+        curr_format = '"₹"#,##0.00'
+    elif settings.currency in ['JPY', '¥']:
+        curr_format = '"¥"#,##0'
+    else:
+        curr_format = '#,##0.00'
+    
     # Styling variables
     header_fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid") # Neon Green
     header_font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
@@ -137,7 +151,7 @@ def export_excel():
         
         val_cell = ws1.cell(row=idx, column=2, value=m_val)
         val_cell.font = data_font
-        val_cell.number_format = f'$#,##0.00' if settings.currency == 'USD' else f'[$€-2] #,##0.00'
+        val_cell.number_format = curr_format
         val_cell.border = thin_border
         ws1.row_dimensions[idx].height = 20
         
@@ -158,7 +172,7 @@ def export_excel():
     for r in range(2, len(incomes) + 2):
         ws2.cell(row=r, column=1).alignment = align_center
         ws2.cell(row=r, column=1).number_format = 'YYYY-MM-DD'
-        ws2.cell(row=r, column=3).number_format = '$#,##0.00'
+        ws2.cell(row=r, column=3).number_format = curr_format
         for c in range(1, 5):
             ws2.cell(row=r, column=c).font = data_font
             ws2.cell(row=r, column=c).border = thin_border
@@ -180,7 +194,7 @@ def export_excel():
     for r in range(2, len(expenses) + 2):
         ws3.cell(row=r, column=1).alignment = align_center
         ws3.cell(row=r, column=1).number_format = 'YYYY-MM-DD'
-        ws3.cell(row=r, column=3).number_format = '$#,##0.00'
+        ws3.cell(row=r, column=3).number_format = curr_format
         for c in range(1, 5):
             ws3.cell(row=r, column=c).font = data_font
             ws3.cell(row=r, column=c).border = thin_border
@@ -200,7 +214,7 @@ def export_excel():
         ws4.append([b.category, b.limit_amount, b.month])
         
     for r in range(2, len(budgets) + 2):
-        ws4.cell(row=r, column=2).number_format = '$#,##0.00'
+        ws4.cell(row=r, column=2).number_format = curr_format
         ws4.cell(row=r, column=3).alignment = align_center
         for c in range(1, 4):
             ws4.cell(row=r, column=c).font = data_font
@@ -221,8 +235,8 @@ def export_excel():
         ws5.append([s.name, s.target_amount, s.current_amount, s.target_date])
         
     for r in range(2, len(savings) + 2):
-        ws5.cell(row=r, column=2).number_format = '$#,##0.00'
-        ws5.cell(row=r, column=3).number_format = '$#,##0.00'
+        ws5.cell(row=r, column=2).number_format = curr_format
+        ws5.cell(row=r, column=3).number_format = curr_format
         ws5.cell(row=r, column=4).alignment = align_center
         ws5.cell(row=r, column=4).number_format = 'YYYY-MM-DD'
         for c in range(1, 5):
@@ -246,7 +260,7 @@ def export_excel():
     for r in range(2, len(tx_list) + 2):
         ws6.cell(row=r, column=2).alignment = align_center
         ws6.cell(row=r, column=2).number_format = 'YYYY-MM-DD'
-        ws6.cell(row=r, column=4).number_format = '$#,##0.00'
+        ws6.cell(row=r, column=4).number_format = curr_format
         for c in range(1, 6):
             ws6.cell(row=r, column=c).font = data_font
             ws6.cell(row=r, column=c).border = thin_border
