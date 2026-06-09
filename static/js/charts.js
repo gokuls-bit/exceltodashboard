@@ -1,4 +1,4 @@
-// FinFlow Analytics and Chart rendering using Chart.js
+
 
 document.addEventListener('DOMContentLoaded', () => {
     // Only load charts if we are on a page containing chart canvas elements
