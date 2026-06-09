@@ -1,7 +1,7 @@
 
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Only load charts if we are on a page containing chart canvas elements
+   
     const cashFlowCanvas = document.getElementById('cashFlowChart');
     const breakdownCanvas = document.getElementById('breakdownChart');
     const budgetCanvas = document.getElementById('budgetChart');
