@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const savingsCanvas = document.getElementById('savingsChart');
     
     if (!cashFlowCanvas && !breakdownCanvas && !budgetCanvas && !savingsCanvas) {
-        return; // Not on the dashboard page
+        return;
     }
     
     // Fetch theme-appropriate colors from CSS custom properties
