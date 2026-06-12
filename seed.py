@@ -22,8 +22,6 @@ def seed_database():
             SavingsGoal(name="Vacation Fund", target_amount=800.0, current_amount=0.0, target_date=date(2026, 8, 20), user_id=test_user.id)
         ]
         db.session.add_all(savings_goals)
-        
-        # 4. Monthly Budgets (Current Month YYYY-MM)
         current_month_str = date.today().strftime('%Y-%m')
         budgets = [
             Budget(category="Food", limit_amount=300.0, month=current_month_str, user_id=test_user.id),
@@ -34,17 +32,12 @@ def seed_database():
             Budget(category="Education", limit_amount=100.0, month=current_month_str, user_id=test_user.id)
         ]
         db.session.add_all(budgets)
-        
-        # 5. Incomes (Spread across last 4 months)
         today = date.today()
         incomes = [
-            # Current Month
             Income(date=today - timedelta(days=2), source="Part-Time Income", amount=650.0, description="Bi-weekly library assistant stipend", user_id=test_user.id),
             Income(date=today - timedelta(days=12), source="Freelancing", amount=850.0, description="Website design contract", user_id=test_user.id),
             Income(date=today - timedelta(days=20), source="Scholarship", amount=400.0, description="Monthly academic excellence stipend", user_id=test_user.id),
             Income(date=today - timedelta(days=25), source="Pocket Money", amount=200.0, description="Monthly allowance", user_id=test_user.id),
-            
-            # Previous Month (Month - 1)
             Income(date=today - timedelta(days=32), source="Part-Time Income", amount=650.0, description="Library assistant paycheck", user_id=test_user.id),
             Income(date=today - timedelta(days=40), source="Freelancing", amount=500.0, description="Logo graphics design", user_id=test_user.id),
             Income(date=today - timedelta(days=50), source="Scholarship", amount=400.0, description="Monthly stipend", user_id=test_user.id),
