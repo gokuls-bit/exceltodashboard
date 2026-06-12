@@ -3,7 +3,7 @@ from flask import Flask
 from database.models import db
 from routes.auth import auth_bp
 from routes.dashboard import dashboard_bp
-from routes.income import income_bp
+from routes.income import income_bp   
 from routes.expense import expense_bp
 from routes.budget import budget_bp 
 from routes.savings import savings_bp
