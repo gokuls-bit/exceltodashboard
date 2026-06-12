@@ -9,20 +9,13 @@ def seed_database():
         # Clear existing data to make it clean
         db.drop_all()
         db.create_all()
-        
         print("Seeding database...")
-        
-        # 1. Create Default Test User
         test_user = User(username='student', email='student@finflow.com')
         test_user.set_password('studentpass')
         db.session.add(test_user)
-        db.session.flush() # Populate test_user.id
-        
-        # 2. Default Settings for user
+        db.session.flush() 
         settings = Settings(currency='USD', theme='light', export_preference='excel', user_id=test_user.id)
         db.session.add(settings)
-        
-        # 3. Savings Goals
         savings_goals = [
             SavingsGoal(name="Laptop Purchase", target_amount=1200.0, current_amount=450.0, target_date=date(2026, 9, 30), user_id=test_user.id),
             SavingsGoal(name="Emergency Fund", target_amount=1500.0, current_amount=900.0, target_date=date(2026, 12, 31), user_id=test_user.id),
