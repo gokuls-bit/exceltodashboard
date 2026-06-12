@@ -6,7 +6,6 @@ from database.models import db, User, Income, Expense, Budget, SavingsGoal, Sett
 def seed_database():
     app = create_app()
     with app.app_context():
-        # Clear existing data to make it clean
         db.drop_all()
         db.create_all()
         print("Seeding database...")
